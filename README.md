@@ -2,11 +2,56 @@
 
 Fail2Ban/CSF-style log analyzer and auto-banning daemon.
 
+## Install
+### Quick install (after extract)
+```bash
+chmod +x install.sh uninstall.sh
+sudo ./install.sh
+sudo ./uninstall.sh
+```
+
+### Download & extract (example)
+```bash
+# Replace URL and archive name as needed
+curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.0/mef-release.tar.gz
+tar -xzf mef-release.tar.gz
+cd mef-release
+```
+
+### Manual install
+#### Linux (systemd, Debian/Ubuntu/RHEL/Fedora)
+```bash
+sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist
+sudo cp -f bin/mefdaemon /usr/local/sbin/mefdaemon
+sudo cp -f bin/mefctl /usr/local/sbin/mefctl
+sudo chmod 0755 /usr/local/sbin/mefdaemon /usr/local/sbin/mefctl
+
+sudo cp -n conf/mef.conf /etc/mef/mef.conf
+sudo cp -n conf/mef.rules /etc/mef/mef.rules
+sudo cp -n conf/rules.d/*.conf /etc/mef/rules.d/
+sudo cp -n conf/whitelist/example.conf /etc/mef/whitelist/example.conf
+
+sudo cp -f services/systemd/mefdaemon.service /etc/systemd/system/mefdaemon.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now mefdaemon
+```
+
+#### FreeBSD
+```sh
+sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist
+sudo install -m 0755 bin/mefdaemon /usr/local/sbin/mefdaemon
+sudo install -m 0755 bin/mefctl /usr/local/sbin/mefctl
+sudo install -m 0644 conf/mef.conf /etc/mef/mef.conf
+sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
+sudo install -m 0644 conf/rules.d/*.conf /etc/mef/rules.d/
+sudo install -m 0644 conf/whitelist/example.conf /etc/mef/whitelist/example.conf
+
+sudo install -m 0755 services/freebsd/mefdaemon.rc /usr/local/etc/rc.d/mefdaemon
+echo 'mefdaemon_enable="YES"' | sudo tee -a /etc/rc.conf >/dev/null
+sudo service mefdaemon start
+```
+
 ## Commands
-- Install binaries: copy `bin/mefdaemon` and `bin/mefctl` to `/usr/local/sbin`
-- Install configs: copy `conf/mef.conf`, `conf/mef.rules`, `conf/rules.d/*.conf`
-- Install service (Linux/systemd): `services/systemd/mefdaemon.service`
-- Install service (FreeBSD): `services/freebsd/mefdaemon.rc`
 - Flush bans (systemd): `systemctl reload mefdaemon`
 - Clear firewall rules (mefctl): `mefctl rules clear`
 - Clear entire nftables table (mefctl): `mefctl rules clear --all [--force]`
