@@ -1,0 +1,15 @@
+[Unit]
+Description=mef daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/mefdaemon
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=1
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+# mef firewall rules v1 (example)
+# NOTE: mef firewall fmt will expand missing fields to canonical form.
+# NOTE: iif=any / oif=any do NOT match loopback (lo). Loopback is explicit.
+
+# ---- defaults ----
+policy dir=in  action=drop
+policy dir=fwd action=drop
+policy dir=out action=accept  # tighten later if needed
+
+# ---- always allow loopback ----
+rule dir=in  action=accept proto=all iif=lo  comment="loopback in"
+rule dir=out action=accept proto=all oif=lo  comment="loopback out"
+
+# ---- allow established/related (non-loopback) ----
+rule dir=in  action=accept proto=all ct=established,related comment="ct established/related in"
+rule dir=out action=accept proto=all ct=established,related comment="ct established/related out"
+
+# ---- inbound services (WAN auto) ----
+
+# SSH: allow ONLY from admin networks (examples)
+rule dir=in action=accept proto=tcp iif=auto src=95.217.31.237 dport=22 comment="SSH admin IP"
+rule dir=in action=accept proto=tcp iif=auto src=185.185.168.0/22 dport=22 comment="SSH admin net"
+# (no generic SSH allow; others will hit policy dir=in drop)
+
+# SMTP / Submission open to the world (typical mail server)
+rule dir=in action=accept proto=tcp iif=auto dport=25  comment="SMTP"
+rule dir=in action=accept proto=tcp iif=auto dport=587 comment="SUBMISSION"
+
+# ICMP (optional, for troubleshooting)
+rule dir=in action=accept proto=icmp  iif=auto comment="ICMPv4 ping"
+rule dir=in action=accept proto=icmp6 iif=auto comment="ICMPv6 ping"
+
+# ---- outbound (WAN auto) ----
+rule dir=out action=accept proto=all oif=auto comment="OUTBOUND"
+
