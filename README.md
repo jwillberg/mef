@@ -5,6 +5,7 @@ Fail2Ban/CSF-style log analyzer and auto-banning daemon.
 ## Install
 ### Quick install (after extract)
 ```bash
+cd /tmp/mef-release
 chmod +x install.sh uninstall.sh
 sudo ./install.sh
 sudo ./uninstall.sh
@@ -14,8 +15,8 @@ sudo ./uninstall.sh
 ```bash
 # Replace URL and archive name as needed
 curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.0/mef-release.tar.gz
-tar -xzf mef-release.tar.gz
-cd mef-release
+tar -xzf mef-release.tar.gz -C /tmp
+cd /tmp/mef-release
 ```
 
 ### Manual install
