@@ -1,6 +1,23 @@
 # mef
 
-Fail2Ban/CSF-style log analyzer and auto-banning daemon.
+Malware.Expert Firewall (mef) is an easy‑to‑use firewall plus a lightweight, log‑driven auto‑ban engine.
+It combines **mefctl** (firewall rules) and **mefdaemon** (journal/file log monitoring).
+
+## What is it?
+- **Firewall management** without complex rule syntax (`mef.rules`)
+- **Automatic IP bans** from logs (SSH, Postfix, etc.)
+- **Nftables first**, iptables fallback
+- **Lightweight and scalable**, no libsystemd dependency
+
+## Who is it for?
+- Servers that want a **simple** and **clear** firewall + auto‑ban setup
+- A lightweight alternative to UFW/CSF/Fail2Ban‑style stacks
+
+## Highlights
+- Journal **and** file log inputs (`source=journal/file`)
+- One clear config per service (no separate jail/filter)
+- Bans via nftables/iptables backends
+- Safe defaults, easy install
 
 ## Install
 ### Quick install (after extract)
