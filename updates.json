@@ -1,0 +1,36 @@
+{
+  "latest_version": "1.0.0",
+  "min_version": "1.0.0",
+  "assets": {
+    "linux_amd64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_linux_amd64",
+      "sha256": "72700bcd901cd3b39316eac6d3ac3ab3adbdb45f6fbfc13740ba195b8b3a3333",
+      "size": 3985828
+    },
+    "linux_arm64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_linux_arm64",
+      "sha256": "8c189221200208bc96977ae648f61563dec8092776700f164adae2540e889c97",
+      "size": 2972396
+    },
+    "darwin_amd64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_darwin_amd64",
+      "sha256": "e2da0ccf684bfcd4e97525ad1eb16099fd1002a97897da579ecd4fbb9db6b275",
+      "size": 12463504
+    },
+    "darwin_arm64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_darwin_arm64",
+      "sha256": "ada632ae736b50129440ba110122861f30ec8066b0fcb91e058c0cf082062fb1",
+      "size": 10225794
+    },
+    "freebsd_amd64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_freebsd_amd64",
+      "sha256": "677c392ef695d69d696a7bf5c889782de19c1b94f111b63905077433f88ac084",
+      "size": 12050590
+    },
+    "freebsd_arm64": {
+      "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_freebsd_arm64",
+      "sha256": "04e23f742f7f87c265c477c6e376dc578819ab77cf37fa9a0efc7831dace001c",
+      "size": 9896094
+    }
+  }
+}
