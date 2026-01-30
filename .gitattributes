@@ -1,0 +1,15 @@
+# GitHub Linguist language detection
+
+# Shell scripts
+*.sh linguist-language=Shell
+
+# Go binaries (compiled)
+bin/* linguist-language=Go diff=binary
+
+# Configuration files
+*.conf linguist-language=INI
+*.md linguist-language=Markdown
+
+# Systemd and FreeBSD RC scripts
+services/systemd/* linguist-language=INI
+services/freebsd/* linguist-language=Shell

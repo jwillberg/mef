@@ -94,7 +94,7 @@ Global config (INI-style):
 - `firewall_hook` (nftables hook, default `input`)
 - `firewall_priority` (nftables hook priority, default `-100`)
 - `firewall_log_enabled` (enable LOG before DROP, default `true`)
-- `firewall_log_prefix` (LOG prefix, default `MEF DROP `)
+- `firewall_log_prefix` (LOG prefix, default `MEF_`)
 - `firewall_log_level` (LOG level, default `warn`)
 
 ## Whitelist
