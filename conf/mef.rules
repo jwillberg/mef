@@ -17,14 +17,17 @@ rule dir=out action=accept proto=all ct=established,related comment="ct establis
 
 # ---- inbound services (WAN auto) ----
 
-# SSH: allow ONLY from admin networks (examples)
-rule dir=in action=accept proto=tcp iif=auto src=95.217.31.237 dport=22 comment="SSH admin IP"
-rule dir=in action=accept proto=tcp iif=auto src=185.185.168.0/22 dport=22 comment="SSH admin net"
-# (no generic SSH allow; others will hit policy dir=in drop)
+# SSH: OPEN by default for initial setup - RESTRICT THIS AFTER TESTING!
+# After confirming access, uncomment src= lines below and remove the open rule
+rule dir=in action=accept proto=tcp iif=auto dport=22 comment="SSH - OPEN (RESTRICT THIS!)"
 
-# SMTP / Submission open to the world (typical mail server)
-rule dir=in action=accept proto=tcp iif=auto dport=25  comment="SMTP"
-rule dir=in action=accept proto=tcp iif=auto dport=587 comment="SUBMISSION"
+# SSH restricted examples (use these INSTEAD of open rule above):
+# rule dir=in action=accept proto=tcp iif=auto src=YOUR.IP.ADDR.HERE dport=22 comment="SSH admin IP"
+# rule dir=in action=accept proto=tcp iif=auto src=185.185.168.0/22 dport=22 comment="SSH admin network"
+
+# SMTP / Submission examples (uncomment if running mail server):
+# rule dir=in action=accept proto=tcp iif=auto dport=25  comment="SMTP"
+# rule dir=in action=accept proto=tcp iif=auto dport=587 comment="SUBMISSION"
 
 # ICMP (optional, for troubleshooting)
 rule dir=in action=accept proto=icmp  iif=auto comment="ICMPv4 ping"

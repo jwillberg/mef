@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# PROVIDE: mef
+# REQUIRE: NETWORKING netif
+# KEYWORD: shutdown
+#
+# mef firewall rules service
+# Loads persistent firewall policy rules from /etc/mef/mef.rules
+# This is a standalone service - mefdaemon is NOT required
+#
+# Add the following line to /etc/rc.conf to enable mef:
+# mef_enable="YES"
+
+. /etc/rc.subr
+
+name="mef"
+rcvar="mef_enable"
+desc="mef firewall policy rules"
+
+start_cmd="mef_start"
+stop_cmd="mef_stop"
+status_cmd="mef_status"
+reload_cmd="mef_reload"
+
+extra_commands="reload"
+
+mef_start()
+{
+    echo "Loading mef firewall policy rules..."
+    /usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules
+}
+
+mef_stop()
+{
+    echo "Removing mef firewall policy rules..."
+    /usr/local/sbin/mefctl rules clear
+}
+
+mef_status()
+{
+    /usr/local/sbin/mefctl status
+}
+
+mef_reload()
+{
+    echo "Reloading mef firewall policy rules..."
+    /usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules
+}
+
+load_rc_config $name
+: ${mef_enable:="NO"}
+
+run_rc_command "$1"

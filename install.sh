@@ -86,22 +86,63 @@ fi
 
 if [[ "${OS}" == "Linux" ]]; then
   if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    # Install both services
+    install -m 0644 "${ROOT_DIR}/services/systemd/mef.service" /etc/systemd/system/mef.service
     install -m 0644 "${ROOT_DIR}/services/systemd/mefdaemon.service" /etc/systemd/system/mefdaemon.service
     systemctl daemon-reload
+    
+    echo ""
+    echo "[+] Two services installed:"
+    echo "    mef.service       - persistent firewall rules (from /etc/mef/mef.rules)"
+    echo "    mefdaemon.service - dynamic IP banning (fail2ban-style)"
+    echo ""
+    echo "⚠️  IMPORTANT: Firewall rules NOT enabled by default to prevent lockout!"
+    echo ""
+    echo "BEFORE enabling mef.service:"
+    echo "  1. Edit /etc/mef/mef.rules to match your network"
+    echo "  2. Verify SSH access will be allowed from your IP"
+    echo "  3. Test rules: mefctl rules validate"
+    echo "  4. Apply with rollback: mefctl rules apply (type 'yes' within 30s)"
+    echo "  5. If access OK, enable service: systemctl enable mef.service"
+    echo ""
+    echo "Starting mefdaemon only (auto-banning)..."
     systemctl enable --now mefdaemon.service
-    systemctl restart mefdaemon.service
+    echo "[+] mefdaemon.service started"
   else
-    echo "[!] systemd not detected. Run manually: /usr/local/sbin/mefdaemon"
+    echo "[!] systemd not detected. Run manually:"
+    echo "    /usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules"
+    echo "    /usr/local/sbin/mefdaemon"
   fi
 elif [[ "${OS}" == "FreeBSD" ]]; then
-  install -m 0755 "${ROOT_DIR}/services/freebsd/mefdaemon.rc" /usr/local/etc/rc.d/mefdaemon
+  # Install both rc.d scripts
+  install -m 0755 "${ROOT_DIR}/services/freebsd/mef" /usr/local/etc/rc.d/mef
+  install -m 0755 "${ROOT_DIR}/services/freebsd/mefdaemon" /usr/local/etc/rc.d/mefdaemon
+  
+  echo ""
+  echo "[+] Two services installed:"
+  echo "    mef       - persistent firewall rules (from /etc/mef/mef.rules)"
+  echo "    mefdaemon - dynamic IP banning (fail2ban-style)"
+  echo ""
+  echo "⚠️  IMPORTANT: Firewall rules NOT enabled by default to prevent lockout!"
+  echo ""
+  echo "BEFORE enabling mef:"
+  echo "  1. Edit /etc/mef/mef.rules to match your network"
+  echo "  2. Verify SSH access will be allowed from your IP"
+  echo "  3. Test rules: mefctl rules validate"
+  echo "  4. Apply with rollback: mefctl rules apply (type 'yes' within 30s)"
+  echo "  5. If access OK, enable service: sysrc mef_enable=YES && service mef start"
+  echo ""
+  echo "Starting mefdaemon only (auto-banning)..."
   if ! grep -q '^mefdaemon_enable=' /etc/rc.conf; then
     echo 'mefdaemon_enable="YES"' >> /etc/rc.conf
   fi
   service mefdaemon restart || service mefdaemon start
+  echo "[+] mefdaemon started"
 else
   echo "Unsupported OS: ${OS}"
   exit 1
 fi
 
-echo "[+] Installed"
+echo ""
+echo "[+] Installation complete"
+echo ""

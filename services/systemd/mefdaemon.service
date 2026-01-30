@@ -1,6 +1,7 @@
 [Unit]
-Description=mef daemon
-After=network.target
+Description=mef daemon (auto-ban service)
+Documentation=https://github.com/jwillberg/mef
+After=network.target mef.service
 
 [Service]
 Type=simple

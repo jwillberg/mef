@@ -1,7 +1,27 @@
 # mef
 
 Malware.Expert Firewall (mef) is an easy‑to‑use firewall plus a lightweight, log‑driven auto‑ban engine.
-It combines **mefctl** (firewall rules) and **mefdaemon** (journal/file log monitoring).
+
+## Two Independent Services
+
+mef consists of two standalone services that work together or separately:
+
+### 1. **mef** (firewall rules service)
+- Loads persistent firewall policy rules from `/etc/mef/mef.rules`
+- Runs once at boot (oneshot service)
+- Use this if you want permanent firewall rules
+- Works with nftables or iptables backends
+
+### 2. **mefdaemon** (auto-ban service)
+- Monitors logs (journal/files) for failed authentication attempts
+- Automatically bans offending IPs (fail2ban-style)
+- Runs continuously as a daemon
+- Per-service rules in `/etc/mef/rules.d/*.conf`
+
+**Both services are independent** - you can use:
+- Both together (firewall + auto-banning)
+- Only mefdaemon (fail2ban replacement)
+- Only mef (persistent firewall rules)
 
 ## What is it?
 - **Firewall management** without complex rule syntax (`mef.rules`)
@@ -20,11 +40,25 @@ It combines **mefctl** (firewall rules) and **mefdaemon** (journal/file log moni
 - Safe defaults, easy install
 
 ## Install
+
+⚠️ **IMPORTANT:** The installer enables only `mefdaemon` by default. Firewall rules (`mef.service`) must be enabled manually after verifying SSH access to prevent lockout.
+
 ### Quick install (after extract)
 ```bash
 cd /tmp/mef-release
 chmod +x install.sh uninstall.sh
 sudo ./install.sh
+
+# After install, BEFORE enabling mef.service:
+# 1. Edit /etc/mef/mef.rules to allow SSH from your IP
+# 2. Test: mefctl rules validate
+# 3. Apply with rollback: mefctl rules apply
+# 4. Type "yes" within 30 seconds if SSH still works
+# 5. Enable: systemctl enable mef.service
+```
+
+For uninstall:
+```bash
 sudo ./uninstall.sh
 ```
 
@@ -49,9 +83,19 @@ sudo cp -n conf/mef.rules /etc/mef/mef.rules
 sudo cp -n conf/rules.d/*.conf /etc/mef/rules.d/
 sudo cp -n conf/whitelist/example.conf /etc/mef/whitelist/example.conf
 
+# Install both services
+sudo cp -f services/systemd/mef.service /etc/systemd/system/mef.service
 sudo cp -f services/systemd/mefdaemon.service /etc/systemd/system/mefdaemon.service
 sudo systemctl daemon-reload
+
+# Start mefdaemon only (auto-banning)
 sudo systemctl enable --now mefdaemon
+
+# ⚠️  BEFORE enabling mef.service (firewall rules):
+# 1. Edit /etc/mef/mef.rules - verify SSH is allowed from your IP
+# 2. Test: mefctl rules validate
+# 3. Apply with rollback: mefctl rules apply (type "yes" within 30s)
+# 4. If SSH works, enable: sudo systemctl enable mef.service
 ```
 
 #### FreeBSD
@@ -64,16 +108,57 @@ sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
 sudo install -m 0644 conf/rules.d/*.conf /etc/mef/rules.d/
 sudo install -m 0644 conf/whitelist/example.conf /etc/mef/whitelist/example.conf
 
-sudo install -m 0755 services/freebsd/mefdaemon.rc /usr/local/etc/rc.d/mefdaemon
-echo 'mefdaemon_enable="YES"' | sudo tee -a /etc/rc.conf >/dev/null
+# Install both rc.d services
+sudo install -m 0755 services/freebsd/mef /usr/local/etc/rc.d/mef
+sudo install -m 0755 services/freebsd/mefdaemon /usr/local/etc/rc.d/mefdaemon
+
+# Start mefdaemon only (auto-banning)
+sudo sysrc mefdaemon_enable=YES
 sudo service mefdaemon start
+
+# ⚠️  BEFORE enabling mef (firewall rules):
+# 1. Edit /etc/mef/mef.rules - verify SSH is allowed from your IP
+# 2. Test: mefctl rules validate
+# 3. Apply with rollback: mefctl rules apply (type "yes" within 30s)
+# 4. If SSH works, enable: sudo sysrc mef_enable=YES && sudo service mef start
 ```
 
 ## Commands
-- Flush bans (systemd): `systemctl reload mefdaemon`
-- Clear firewall rules (mefctl): `mefctl rules clear`
-- Clear entire nftables table (mefctl): `mefctl rules clear --all [--force]`
-- Clear bans only (mefctl): `mefctl bans clear`
+### Service Management
+```bash
+# systemd (Linux)
+systemctl status mef mefdaemon
+systemctl reload mef          # Reload firewall rules
+systemctl reload mefdaemon    # Reload daemon config + flush bans
+
+# FreeBSD
+service mef status
+service mefdaemon status
+service mef reload            # Reload firewall rules
+service mefdaemon reload      # Reload daemon config
+```
+
+### Firewall Rules (mefctl)
+```bash
+mefctl rules validate         # Check /etc/mef/mef.rules syntax
+mefctl rules apply            # Apply rules (with rollback confirmation)
+mefctl rules apply --yes      # Apply rules (no confirmation, for service)
+mefctl rules clear            # Clear mef firewall rules
+mefctl rules clear --all --force  # Clear entire nftables table
+```
+
+### Ban Management (mefctl)
+```bash
+mefctl bans list              # Show all banned IPs
+mefctl bans add <ip>          # Manually ban an IP
+mefctl bans delete <ip>       # Unban an IP
+mefctl bans clear             # Clear all bans
+```
+
+### System Status
+```bash
+mefctl status                 # Show firewall status, ban sets, element counts
+```
 
 ## Config
 - Global config: `/etc/mef/mef.conf`

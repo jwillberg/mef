@@ -1,7 +1,15 @@
 #!/bin/sh
+#
 # PROVIDE: mefdaemon
-# REQUIRE: NETWORKING
+# REQUIRE: NETWORKING mef
 # KEYWORD: shutdown
+#
+# mefdaemon - dynamic IP banning service (fail2ban-style auto-ban)
+# This is a standalone service - mef is NOT required
+# If mef is enabled, it will run first to load firewall rules
+#
+# Add the following line to /etc/rc.conf to enable mefdaemon:
+# mefdaemon_enable="YES"
 
 . /etc/rc.subr
 
