@@ -44,10 +44,60 @@ require_root() {
 require_root "$@"
 
 OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+# Map architecture to build suffix
+ARCH_SUFFIX=""
+case "${ARCH}" in
+  x86_64) ARCH_SUFFIX="amd64" ;;
+  aarch64) ARCH_SUFFIX="arm64" ;;
+  arm64) ARCH_SUFFIX="arm64" ;;  # macOS M1/M2
+  *)
+    echo "Unsupported architecture: ${ARCH}"
+    exit 1
+  ;;
+esac
+
+# Map OS to build suffix
+OS_SUFFIX=""
+case "${OS}" in
+  Linux) OS_SUFFIX="linux" ;;
+  FreeBSD) OS_SUFFIX="freebsd" ;;
+  Darwin) OS_SUFFIX="darwin" ;;
+  *)
+    echo "Unsupported OS: ${OS}"
+    exit 1
+  ;;
+esac
+
+# Select correct binaries
+if [[ "${OS_SUFFIX}" == "darwin" ]]; then
+  # macOS: use generic binaries (usually no arch suffix in release)
+  MEFDAEMON_BIN="${ROOT_DIR}/bin/mefdaemon"
+  MEFCTL_BIN="${ROOT_DIR}/bin/mefctl"
+else
+  # Linux/FreeBSD: use OS_arch suffixed binaries
+  MEFDAEMON_BIN="${ROOT_DIR}/bin/mefdaemon_${OS_SUFFIX}_${ARCH_SUFFIX}"
+  MEFCTL_BIN="${ROOT_DIR}/bin/mefctl_${OS_SUFFIX}_${ARCH_SUFFIX}"
+fi
+
+# Verify binaries exist
+if [[ ! -f "${MEFDAEMON_BIN}" ]]; then
+  echo "ERROR: mefdaemon binary not found: ${MEFDAEMON_BIN}"
+  echo "Available binaries:"
+  ls -la "${ROOT_DIR}/bin/" 2>/dev/null || echo "  (bin/ directory empty)"
+  exit 1
+fi
+if [[ ! -f "${MEFCTL_BIN}" ]]; then
+  echo "ERROR: mefctl binary not found: ${MEFCTL_BIN}"
+  echo "Available binaries:"
+  ls -la "${ROOT_DIR}/bin/" 2>/dev/null || echo "  (bin/ directory empty)"
+  exit 1
+fi
 
 install -d /usr/local/sbin
-install -m 0755 "${ROOT_DIR}/bin/mefdaemon" /usr/local/sbin/mefdaemon
-install -m 0755 "${ROOT_DIR}/bin/mefctl" /usr/local/sbin/mefctl
+install -m 0755 "${MEFDAEMON_BIN}" /usr/local/sbin/mefdaemon
+install -m 0755 "${MEFCTL_BIN}" /usr/local/sbin/mefctl
 
 install -d /etc/mef /etc/mef/rules.d /etc/mef/whitelist
 
