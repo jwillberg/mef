@@ -99,7 +99,8 @@ install -d /usr/local/sbin
 install -m 0755 "${MEFDAEMON_BIN}" /usr/local/sbin/mefdaemon
 install -m 0755 "${MEFCTL_BIN}" /usr/local/sbin/mefctl
 
-install -d /etc/mef /etc/mef/rules.d /etc/mef/whitelist
+install -d /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
+touch /etc/mef/blacklist/auto-permanent.conf
 
 if [[ "${FORCE}" == "1" ]]; then
   if [[ -f /etc/mef/mef.conf ]]; then
@@ -115,6 +116,8 @@ if [[ "${FORCE}" == "1" ]]; then
     install -m 0644 "${f}" "/etc/mef/rules.d/${f##*/}"
   done
   install -m 0644 "${ROOT_DIR}/conf/whitelist/example.conf" /etc/mef/whitelist/example.conf
+  install -m 0644 "${ROOT_DIR}/conf/blacklist/example.conf" /etc/mef/blacklist/example.conf
+  touch /etc/mef/blacklist/auto-permanent.conf
 else
   if [[ ! -f /etc/mef/mef.conf ]]; then
     install -m 0644 "${ROOT_DIR}/conf/mef.conf" /etc/mef/mef.conf
@@ -132,6 +135,12 @@ else
   if [[ ! -f /etc/mef/whitelist/example.conf ]]; then
     install -m 0644 "${ROOT_DIR}/conf/whitelist/example.conf" /etc/mef/whitelist/example.conf
   fi
+  if [[ ! -f /etc/mef/blacklist/example.conf ]]; then
+    install -m 0644 "${ROOT_DIR}/conf/blacklist/example.conf" /etc/mef/blacklist/example.conf
+  fi
+  if [[ ! -f /etc/mef/blacklist/auto-permanent.conf ]]; then
+    touch /etc/mef/blacklist/auto-permanent.conf
+  fi
 fi
 
 if [[ "${OS}" == "Linux" ]]; then
@@ -141,23 +150,29 @@ if [[ "${OS}" == "Linux" ]]; then
     install -m 0644 "${ROOT_DIR}/services/systemd/mefdaemon.service" /etc/systemd/system/mefdaemon.service
     systemctl daemon-reload
     
+    # Both services disabled by default (user must enable manually)
+    systemctl disable mef.service || true
+    systemctl disable mefdaemon.service || true
+    
     echo ""
-    echo "[+] Two services installed:"
+    echo "[+] Two services installed (both DISABLED by default):"
     echo "    mef.service       - persistent firewall rules (from /etc/mef/mef.rules)"
     echo "    mefdaemon.service - dynamic IP banning (fail2ban-style)"
     echo ""
-    echo "⚠️  IMPORTANT: Firewall rules NOT enabled by default to prevent lockout!"
+    echo "⚠️  IMPORTANT: Both services are disabled to prevent accidental lockout!"
     echo ""
-    echo "BEFORE enabling mef.service:"
-    echo "  1. Edit /etc/mef/mef.rules to match your network"
-    echo "  2. Verify SSH access will be allowed from your IP"
-    echo "  3. Test rules: mefctl rules validate"
-    echo "  4. Apply with rollback: mefctl rules apply (type 'yes' within 30s)"
-    echo "  5. If access OK, enable service: systemctl enable mef.service"
-    echo ""
-    echo "Starting mefdaemon only (auto-banning)..."
-    systemctl enable --now mefdaemon.service
-    echo "[+] mefdaemon.service started"
+    echo "Next steps:"
+    echo "  1. Review and test /etc/mef/mef.rules:"
+    echo "     - Verify SSH port 22 is open from your IP"
+    echo "     - Run: mefctl rules validate"
+    echo "  2. Enable and test firewall rules:"
+    echo "     - Run: mefctl rules apply (30-second rollback window)"
+    echo "     - Type 'yes' to keep rules if SSH access works"
+    echo "  3. Enable services for boot:"
+    echo "     - mef.service: mefctl enable mef"
+    echo "     - mefdaemon.service: mefctl enable mefdaemon"
+    echo "  4. Verify boot activation:"
+    echo "     - Run: mefctl status"
   else
     echo "[!] systemd not detected. Run manually:"
     echo "    /usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules"
@@ -169,25 +184,24 @@ elif [[ "${OS}" == "FreeBSD" ]]; then
   install -m 0755 "${ROOT_DIR}/services/freebsd/mefdaemon" /usr/local/etc/rc.d/mefdaemon
   
   echo ""
-  echo "[+] Two services installed:"
+  echo "[+] Two services installed (both DISABLED by default):"
   echo "    mef       - persistent firewall rules (from /etc/mef/mef.rules)"
   echo "    mefdaemon - dynamic IP banning (fail2ban-style)"
   echo ""
-  echo "⚠️  IMPORTANT: Firewall rules NOT enabled by default to prevent lockout!"
+  echo "⚠️  IMPORTANT: Both services are disabled to prevent accidental lockout!"
   echo ""
-  echo "BEFORE enabling mef:"
-  echo "  1. Edit /etc/mef/mef.rules to match your network"
-  echo "  2. Verify SSH access will be allowed from your IP"
-  echo "  3. Test rules: mefctl rules validate"
-  echo "  4. Apply with rollback: mefctl rules apply (type 'yes' within 30s)"
-  echo "  5. If access OK, enable service: sysrc mef_enable=YES && service mef start"
-  echo ""
-  echo "Starting mefdaemon only (auto-banning)..."
-  if ! grep -q '^mefdaemon_enable=' /etc/rc.conf; then
-    echo 'mefdaemon_enable="YES"' >> /etc/rc.conf
-  fi
-  service mefdaemon restart || service mefdaemon start
-  echo "[+] mefdaemon started"
+  echo "Next steps:"
+  echo "  1. Review and test /etc/mef/mef.rules:"
+  echo "     - Verify SSH port 22 is open from your IP"
+  echo "     - Run: mefctl rules validate"
+  echo "  2. Enable and test firewall rules:"
+  echo "     - Run: mefctl rules apply (30-second rollback window)"
+  echo "     - Type 'yes' to keep rules if SSH access works"
+  echo "  3. Enable services for boot:"
+  echo "     - mef: mefctl enable mef"
+  echo "     - mefdaemon: mefctl enable mefdaemon"
+  echo "  4. Verify boot activation:"
+  echo "     - Run: mefctl status"
 else
   echo "Unsupported OS: ${OS}"
   exit 1

@@ -41,7 +41,7 @@ mef consists of two standalone services that work together or separately:
 
 ## Install
 
-⚠️ **IMPORTANT:** The installer enables only `mefdaemon` by default. Firewall rules (`mef.service`) must be enabled manually after verifying SSH access to prevent lockout.
+⚠️ **IMPORTANT:** Both services are **disabled by default** to prevent accidental lockout. You must enable them manually after testing.
 
 ### Quick install (after extract)
 ```bash
@@ -49,12 +49,18 @@ cd /tmp/mef-release
 chmod +x install.sh uninstall.sh
 sudo ./install.sh
 
-# After install, BEFORE enabling mef.service:
-# 1. Edit /etc/mef/mef.rules to allow SSH from your IP
-# 2. Test: mefctl rules validate
-# 3. Apply with rollback: mefctl rules apply
-# 4. Type "yes" within 30 seconds if SSH still works
-# 5. Enable: systemctl enable mef.service
+# After install - both services are DISABLED by default
+# Test firewall rules first:
+mefctl rules validate
+mefctl rules apply    # 30-second rollback window, type "yes" if SSH works
+
+# When SSH access is verified, enable services:
+mefctl enable mef           # Enable firewall rules at boot
+mefctl enable mefdaemon     # Enable auto-banning at boot
+# Or enable both: mefctl enable
+
+# Verify they're enabled:
+mefctl status
 ```
 
 For uninstall:
@@ -73,7 +79,7 @@ cd /tmp/mef-release
 ### Manual install
 #### Linux (systemd, Debian/Ubuntu/RHEL/Fedora)
 ```bash
-sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist
+sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
 sudo cp -f bin/mefdaemon /usr/local/sbin/mefdaemon
 sudo cp -f bin/mefctl /usr/local/sbin/mefctl
 sudo chmod 0755 /usr/local/sbin/mefdaemon /usr/local/sbin/mefctl
@@ -82,47 +88,62 @@ sudo cp -n conf/mef.conf /etc/mef/mef.conf
 sudo cp -n conf/mef.rules /etc/mef/mef.rules
 sudo cp -n conf/rules.d/*.conf /etc/mef/rules.d/
 sudo cp -n conf/whitelist/example.conf /etc/mef/whitelist/example.conf
+sudo cp -n conf/blacklist/example.conf /etc/mef/blacklist/example.conf
 
-# Install both services
+# Install both services (both DISABLED by default)
 sudo cp -f services/systemd/mef.service /etc/systemd/system/mef.service
 sudo cp -f services/systemd/mefdaemon.service /etc/systemd/system/mefdaemon.service
 sudo systemctl daemon-reload
 
-# Start mefdaemon only (auto-banning)
-sudo systemctl enable --now mefdaemon
+# Both services are disabled by default to prevent lockout
+# Test firewall rules first:
+mefctl rules validate
+mefctl rules apply    # 30-second rollback window, type "yes" if SSH works
 
-# ⚠️  BEFORE enabling mef.service (firewall rules):
-# 1. Edit /etc/mef/mef.rules - verify SSH is allowed from your IP
-# 2. Test: mefctl rules validate
-# 3. Apply with rollback: mefctl rules apply (type "yes" within 30s)
-# 4. If SSH works, enable: sudo systemctl enable mef.service
+# When SSH access is verified, enable services:
+mefctl enable mef           # Enable firewall rules at boot
+mefctl enable mefdaemon     # Enable auto-banning at boot
+
+# Verify they're enabled:
+mefctl status
 ```
 
 #### FreeBSD
 ```sh
-sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist
+sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
 sudo install -m 0755 bin/mefdaemon /usr/local/sbin/mefdaemon
 sudo install -m 0755 bin/mefctl /usr/local/sbin/mefctl
 sudo install -m 0644 conf/mef.conf /etc/mef/mef.conf
 sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
-sudo install -m 0644 conf/rules.d/*.conf /etc/mef/rules.d/
-sudo install -m 0644 conf/whitelist/example.conf /etc/mef/whitelist/example.conf
-
-# Install both rc.d services
+sudo install -m 0644 conf/ru (both DISABLED by default)
 sudo install -m 0755 services/freebsd/mef /usr/local/etc/rc.d/mef
 sudo install -m 0755 services/freebsd/mefdaemon /usr/local/etc/rc.d/mefdaemon
 
-# Start mefdaemon only (auto-banning)
-sudo sysrc mefdaemon_enable=YES
-sudo service mefdaemon start
+# Both services are disabled by default to prevent lockout
+# Test firewall rules first:
+mefctl rules validate
+mefctl rules apply    # 30-second rollback window, type "yes" if SSH works
 
-# ⚠️  BEFORE enabling mef (firewall rules):
-# 1. Edit /etc/mef/mef.rules - verify SSH is allowed from your IP
+# When SSH access is verified, enable services:
+mefctl enable mef           # Enable firewall rules at boot
+mefctl enable mefdaemon     # Enable auto-banning at boot
+
+# Verify they're enabled:
+mefctl status
 # 2. Test: mefctl rules validate
 # 3. Apply with rollback: mefctl rules apply (type "yes" within 30s)
 # 4. If SSH works, enable: sudo sysrc mef_enable=YES && sudo service mef start
 ```
+ (via mefctl)
+```bash
+mefctl status                 # Show service status (enabled/running)
+mefctl enable [mef|mefdaemon] # Enable service(s) to start at boot (both if none specified)
+mefctl disable [mef|mefdaemon]# Disable service(s) from starting at boot
+mefctl start mef|mefdaemon    # Start service immediately
+mefctl stop mef|mefdaemon     # Stop service immediately
+```
 
+### Service Management (via systemctl/service)
 ## Commands
 ### Service Management
 ```bash
@@ -170,9 +191,17 @@ Global config (INI-style):
 - `rules_dir` (default `/etc/mef/rules.d`)
 - `whitelist_dir` (default `/etc/mef/whitelist`)
 - `whitelist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
+- `blacklist_dir` (default `/etc/mef/blacklist`)
+- `blacklist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
+- `cache_dir` (default `/etc/mef/cache`, daemon runtime state)
 - `debug` (enable debug logging, default `false`)
 - `debug_log` (log file path when debug is enabled, default `/tmp/mef.txt`)
+- `ban_log_enabled` (enable dedicated BAN audit log, default `false`)
+- `ban_log_path` (BAN audit log path, default `/var/log/mef.log`)
+- `clear_bans_on_stop` (flush active ban sets when daemon stops, default `false`)
 - `journal_since` (default `2 min ago`)
+- `file_recent_limit` (startup cap for `source=file` matched logs, default `200`, `0` = disabled)
+- `file_recent_window` (startup recency window for `source=file`, default `24h`, `0` = disabled)
 - `firewall_backend` (`auto` | `nftables` | `iptables`)
 - `firewall_family` (nftables table family, default `inet`)
 - `firewall_table` (nftables table name, default `mef`)
@@ -199,6 +228,17 @@ Comments are allowed:
 
 Whitelist entries are loaded into memory and reloaded periodically (default `1m`, configurable via `whitelist_reload`).
 
+## Blacklist
+Blacklist files are read from `/etc/mef/blacklist/*.conf` (configurable via `blacklist_dir`).
+
+Repo example blacklist: [conf/blacklist/example.conf](conf/blacklist/example.conf)
+
+Format: one entry per line (`IP` or `CIDR`).
+
+Blacklist entries are enforced as permanent bans and reloaded periodically (default `1m`, configurable via `blacklist_reload`).
+
+Whitelist has precedence: if an address matches both, whitelist wins.
+
 ## Firewall backends
 - nftables (preferred)
 - iptables (fallback)
@@ -213,6 +253,20 @@ Rules can specify action and ports:
 - `action=ban` or `action=detect`
 - `ports=all` or `ports=22,25` or `ports=22-2222`
 - `backend=auto|nftables|iptables`
+
+Optional escalation keys (fail2ban recidive style):
+- `escalation_enabled=true|false`
+- `escalation_window=24h` (Go duration or integer seconds)
+- `permanent_threshold=5` (number of first-level bans before permanent ban)
+
+Example: enable escalation only for nginx (`/etc/mef/rules.d/nginx.conf`):
+```ini
+escalation_enabled=true
+escalation_window=24h
+permanent_threshold=5
+```
+
+Keep other service rules with `escalation_enabled=false`.
 
 ## Code documentation
 Keeping the code well-documented is important for this project. Please add clear file headers and comments for non-obvious logic so future maintenance and search are easy.
