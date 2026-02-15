@@ -1,6 +1,13 @@
 # mef
 
-Malware.Expert Firewall (mef) is an easy‑to‑use firewall plus a lightweight, log‑driven auto‑ban engine.
+**mef (Malware.Expert Firewall)** is a lightweight Linux firewall and automatic IP ban engine.
+
+It combines:
+- **Persistent firewall management** (nftables preferred, iptables fallback)
+- **Fail2ban-style log monitoring and automatic IP blocking**
+- Native **systemd / FreeBSD service integration**
+
+Designed as a simple, modern alternative to UFW, CSF and Fail2Ban stacks.
 
 ## Two Independent Services
 
@@ -270,3 +277,9 @@ Keep other service rules with `escalation_enabled=false`.
 
 ## Code documentation
 Keeping the code well-documented is important for this project. Please add clear file headers and comments for non-obvious logic so future maintenance and search are easy.
+
+## Keywords
+
+linux firewall, nftables, iptables, fail2ban alternative, intrusion prevention,
+ip blocking, log monitoring, ssh protection, postfix protection,
+systemd firewall service, freebsd firewall daemon
