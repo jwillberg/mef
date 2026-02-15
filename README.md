@@ -46,6 +46,19 @@ mef consists of two standalone services that work together or separately:
 - Bans via nftables/iptables backends
 - Safe defaults, easy install
 
+## Architecture
+
+mef is split into two independent components:
+
+- **mef** → firewall rules loader (persistent policy service)
+- **mefdaemon** → log parser + dynamic IP ban engine
+
+Firewall backends:
+- nftables (primary)
+- iptables (fallback)
+
+The daemon maintains in-memory IP sets and updates firewall rules dynamically.
+
 ## Install
 
 ⚠️ **IMPORTANT:** Both services are **disabled by default** to prevent accidental lockout. You must enable them manually after testing.
