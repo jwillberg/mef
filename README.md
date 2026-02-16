@@ -135,7 +135,10 @@ sudo install -m 0755 bin/mefdaemon /usr/local/sbin/mefdaemon
 sudo install -m 0755 bin/mefctl /usr/local/sbin/mefctl
 sudo install -m 0644 conf/mef.conf /etc/mef/mef.conf
 sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
-sudo install -m 0644 conf/ru (both DISABLED by default)
+sudo install -d /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist
+sudo install -m 0644 conf/rules.d/*.conf /etc/mef/rules.d/
+sudo install -m 0644 conf/whitelist/example.conf /etc/mef/whitelist/example.conf
+sudo install -m 0644 conf/blacklist/example.conf /etc/mef/blacklist/example.conf
 sudo install -m 0755 services/freebsd/mef /usr/local/etc/rc.d/mef
 sudo install -m 0755 services/freebsd/mefdaemon /usr/local/etc/rc.d/mefdaemon
 
@@ -150,55 +153,75 @@ mefctl enable mefdaemon     # Enable auto-banning at boot
 
 # Verify they're enabled:
 mefctl status
-# 2. Test: mefctl rules validate
-# 3. Apply with rollback: mefctl rules apply (type "yes" within 30s)
-# 4. If SSH works, enable: sudo sysrc mef_enable=YES && sudo service mef start
-```
- (via mefctl)
-```bash
-mefctl status                 # Show service status (enabled/running)
-mefctl enable [mef|mefdaemon] # Enable service(s) to start at boot (both if none specified)
-mefctl disable [mef|mefdaemon]# Disable service(s) from starting at boot
-mefctl start mef|mefdaemon    # Start service immediately
-mefctl stop mef|mefdaemon     # Stop service immediately
 ```
 
-### Service Management (via systemctl/service)
 ## Commands
-### Service Management
+
+### mefctl (CLI)
+```bash
+mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
+  fmt                            # Normalize/pretty-print rules file
+  validate                       # Validate syntax + interfaces (recommended before apply)
+  apply                          # Apply rules to firewall
+  clear                          # Remove mefctl rules
+  clear --all                    # Delete whole nftables table (DANGEROUS)
+  clear --all --force            # Skip confirmation
+
+mefctl bans <action>
+  list                           # List current bans
+  add <IP[/CIDR]>                # Add manual ban
+  delete <IP[/CIDR]>             # Delete manual ban
+  clear                          # Clear mefdaemon bans only
+
+mefctl lists <type>
+  whitelist                      # Show whitelist entries
+  blacklist                      # Show permanent blacklist entries
+  recidive                       # Show persistent recidive counters
+
+mefctl status                    # Show service + firewall status
+mefctl enable [mef|mefdaemon]
+mefctl disable [mef|mefdaemon]
+mefctl start   <mef|mefdaemon>
+mefctl stop    <mef|mefdaemon>
+mefctl reload  <mef|mefdaemon>
+mefctl restart <mef|mefdaemon>
+```
+
+Notes:
+- `[FILE]` is optional. If omitted, mefctl uses `/etc/mef/mef.rules`.
+- `rules fmt` does NOT modify firewall state.
+- `rules validate` is recommended before `rules apply`.
+
+### mefctl Options
+```bash
+rules fmt
+  --write
+  --out <FILE>
+
+rules apply
+  --timeout <duration>
+  --yes
+
+bans add
+  --timeout <duration>
+  --ports <port[,port,...]>
+
+bans list
+  --verbose
+```
+
+### systemctl/service management
 ```bash
 # systemd (Linux)
 systemctl status mef mefdaemon
 systemctl reload mef          # Reload firewall rules
-systemctl reload mefdaemon    # Reload daemon config + flush bans
+systemctl reload mefdaemon    # Reload daemon config
 
 # FreeBSD
 service mef status
 service mefdaemon status
 service mef reload            # Reload firewall rules
 service mefdaemon reload      # Reload daemon config
-```
-
-### Firewall Rules (mefctl)
-```bash
-mefctl rules validate         # Check /etc/mef/mef.rules syntax
-mefctl rules apply            # Apply rules (with rollback confirmation)
-mefctl rules apply --yes      # Apply rules (no confirmation, for service)
-mefctl rules clear            # Clear mef firewall rules
-mefctl rules clear --all --force  # Clear entire nftables table
-```
-
-### Ban Management (mefctl)
-```bash
-mefctl bans list              # Show all banned IPs
-mefctl bans add <ip>          # Manually ban an IP
-mefctl bans delete <ip>       # Unban an IP
-mefctl bans clear             # Clear all bans
-```
-
-### System Status
-```bash
-mefctl status                 # Show firewall status, ban sets, element counts
 ```
 
 ## Config
