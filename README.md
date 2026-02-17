@@ -164,6 +164,7 @@ mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
   validate                       # Validate syntax + interfaces (recommended before apply)
   apply                          # Apply rules to firewall
   clear                          # Remove mefctl rules
+  migrate                        # Export running nftables table to mef.rules format
   clear --all                    # Delete whole nftables table (DANGEROUS)
   clear --all --force            # Skip confirmation
 
@@ -191,6 +192,8 @@ Notes:
 - `[FILE]` is optional. If omitted, mefctl uses `/etc/mef/mef.rules`.
 - `rules fmt` does NOT modify firewall state.
 - `rules validate` is recommended before `rules apply`.
+- `rules migrate` reads running nftables rules and prints mef.rules text to stdout by default.
+- `rules migrate` excludes the mef.conf managed nft table by default.
 
 ### mefctl Options
 ```bash
@@ -201,6 +204,12 @@ rules fmt
 rules apply
   --timeout <duration>
   --yes
+
+rules migrate
+  --write                        # write to /etc/mef/rules.migrate
+  --out <FILE>
+  --family <ip|ip6|inet>
+  --table <NAME>
 
 bans add
   --timeout <duration>

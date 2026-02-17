@@ -7,7 +7,6 @@
 Description=mef firewall policy rules
 Documentation=https://github.com/jwillberg/mef
 After=network.target network-online.target
-DefaultDependencies=no
 
 [Service]
 Type=oneshot
@@ -17,3 +16,6 @@ ExecStop=/usr/local/sbin/mefctl rules clear
 ExecReload=/usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules
 StandardOutput=journal
 StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
