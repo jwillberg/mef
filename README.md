@@ -237,6 +237,10 @@ service mefdaemon reload      # Reload daemon config
 - Global config: `/etc/mef/mef.conf`
 - Per-service rules: `/etc/mef/rules.d/*.conf`
 
+Rule note (`source=journal`):
+- `programs` supports exact names and wildcards, e.g. `sshd`, `sshd*`, `postfix/*`, or `*`.
+- Use `mefctl reload mefdaemon` for config changes only; after binary upgrade, use `mefctl restart mefdaemon`.
+
 Repo default config template: [conf/mef.conf](conf/mef.conf)
 
 Global config (INI-style):

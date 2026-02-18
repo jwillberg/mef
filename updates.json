@@ -4,32 +4,32 @@
   "assets": {
     "linux_amd64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_linux_amd64",
-      "sha256": "f5d1dbd439199a5aa9c8a486d06091efe11b45748ba90b7c79500b92aac87a9e",
-      "size": 3846728
+      "sha256": "44a3b85cae855b0f068e5605d09ef5d7ad539af888db81050f1a6de19943fac0",
+      "size": 4065528
     },
     "linux_arm64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_linux_arm64",
-      "sha256": "4ba00ce71678a62dd87048671e4f39f782f6147814f88ce6268a9397fa279670",
-      "size": 3028720
+      "sha256": "ec929238ad10b2aec812920c0fcdc7a3982f11cec3bbd3e26186cd03b7cad205",
+      "size": 3027268
     },
     "darwin_amd64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_darwin_amd64",
-      "sha256": "0868548eee796969151eb0d7175c97c183e9e24e549134a7a43ecbaf9bb2fc8e",
-      "size": 12724160
+      "sha256": "2faec57ecd05d57de0cff984ab371ecd36d49963b379059ed9e5a893e44f3707",
+      "size": 12713104
     },
     "darwin_arm64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_darwin_arm64",
-      "sha256": "97c0402381adfd275a2083cad7c50cb1e3d7bfe712f9cbec26cfe98bcbb67b30",
-      "size": 10428850
+      "sha256": "b579af60cf250bca7ed5910a4de470c5db63385bdbdff159417af78452b39b4c",
+      "size": 10395058
     },
     "freebsd_amd64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_freebsd_amd64",
-      "sha256": "dc955cf777d8cfcfe62b494edf2884b51fbee53844e1548497ba6c3f5195918d",
-      "size": 12329118
+      "sha256": "1cd08358568868ade05616613feaad782c196d6ae9ee641327949b97d00a0c64",
+      "size": 12325022
     },
     "freebsd_arm64": {
       "url": "https://github.com/jwillberg/mef/releases/download/v1.0.0/mefdaemon_freebsd_arm64",
-      "sha256": "142a762a3e3b308ef63b5313792e17c2683c26f9e74da0ae185ab6cb82c77706",
+      "sha256": "ce12e951b941d651f12b37dad79e32cbeb6fb56115cdd83f9c5d54dd2c057af0",
       "size": 10092702
     }
   }
