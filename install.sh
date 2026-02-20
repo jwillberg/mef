@@ -144,6 +144,18 @@ else
 fi
 
 if [[ "${OS}" == "Linux" ]]; then
+  PSD_CONNTRACK_HINT="install package providing 'conntrack' (often: conntrack or conntrack-tools)"
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_release_blob="${ID:-} ${ID_LIKE:-}"
+    if [[ "${os_release_blob}" == *"debian"* || "${os_release_blob}" == *"ubuntu"* ]]; then
+      PSD_CONNTRACK_HINT="apt install conntrack"
+    elif [[ "${os_release_blob}" == *"rhel"* || "${os_release_blob}" == *"centos"* || "${os_release_blob}" == *"rocky"* || "${os_release_blob}" == *"alma"* || "${os_release_blob}" == *"fedora"* ]]; then
+      PSD_CONNTRACK_HINT="dnf install conntrack-tools (or yum install conntrack-tools)"
+    fi
+  fi
+
   if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
     # Install both services
     install -m 0644 "${ROOT_DIR}/services/systemd/mef.service" /etc/systemd/system/mef.service
@@ -173,6 +185,15 @@ if [[ "${OS}" == "Linux" ]]; then
     echo "     - mefdaemon.service: mefctl enable mefdaemon"
     echo "  4. Verify boot activation:"
     echo "     - Run: mefctl status"
+    echo ""
+    echo "PSD note (optional feature):"
+    if command -v conntrack >/dev/null 2>&1; then
+      echo "  - conntrack command found (PSD primary source available)"
+    else
+      echo "  - conntrack command missing (PSD primary source unavailable)"
+      echo "  - Install with: ${PSD_CONNTRACK_HINT}"
+      echo "  - Or use journal fallback: firewall_log_enabled=true"
+    fi
   else
     echo "[!] systemd not detected. Run manually:"
     echo "    /usr/local/sbin/mefctl rules apply --yes /etc/mef/mef.rules"

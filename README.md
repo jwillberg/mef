@@ -91,7 +91,7 @@ sudo ./uninstall.sh
 ### Download & extract (example)
 ```bash
 # Replace URL and archive name as needed
-curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.0/mef-release.tar.gz
+curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.1/mef-release.tar.gz
 tar -xzf mef-release.tar.gz -C /tmp
 cd /tmp/mef-release
 ```
@@ -256,6 +256,14 @@ Global config (INI-style):
 - `ban_log_path` (BAN audit log path, default `/var/log/mef.log`)
 - `clear_bans_on_stop` (flush active ban sets when daemon stops, default `false`)
 - `journal_since` (default `2 min ago`)
+- `ps_enabled` (enable Port Scan Detection, Linux-only in current version)
+- `ps_limit` (ban threshold for unique destination ports within interval)
+- `ps_interval` (PSD sliding window, Go duration or integer seconds)
+- `ps_bantime` (PSD temporary ban duration, Go duration or integer seconds)
+- `ps_source_order` (source priority list, default `conntrack,journal`)
+- `ps_escalation_enabled` (enable PSD second-stage permanent blacklist escalation)
+- `ps_escalation_window` (PSD escalation window)
+- `ps_permanent_threshold` (first-stage PSD bans before permanent blacklist)
 - `file_recent_limit` (startup cap for `source=file` matched logs, default `200`, `0` = disabled)
 - `file_recent_window` (startup recency window for `source=file`, default `24h`, `0` = disabled)
 - `firewall_backend` (`auto` | `nftables` | `iptables`)
@@ -267,6 +275,73 @@ Global config (INI-style):
 - `firewall_log_enabled` (enable LOG before DROP, default `true`)
 - `firewall_log_prefix` (LOG prefix, default `MEF_`)
 - `firewall_log_level` (LOG level, default `warn`)
+
+## Port Scan Detection (PSD)
+
+PSD is a global detector (not a per-service `rules.d` rule):
+- Detects source IPs that hit many **different destination ports** in a short window.
+- Intended for port scanning behavior (`ps_limit` + `ps_interval`).
+- Not intended to replace service-specific brute-force detection on a single port (SSH/SMTP/HTTP), which still belongs in `rules.d` failregex rules.
+
+Linux v1 source order:
+- Primary: `conntrack`
+- Fallback: `journal` (requires firewall logging and matching prefix)
+
+Linux package prerequisite for primary source:
+- Debian/Ubuntu: `apt install conntrack`
+- RHEL/Rocky/Alma/Fedora: `dnf install conntrack-tools` (or `yum install conntrack-tools`)
+- If not installed, PSD can still run with journal fallback (`firewall_log_enabled=true`).
+
+Recommended test config (`/etc/mef/mef.conf`):
+```ini
+ps_enabled=true
+ps_limit=10
+ps_interval=300
+ps_bantime=3600
+ps_source_order=conntrack,journal
+ps_escalation_enabled=true
+ps_escalation_window=24h
+ps_permanent_threshold=3
+```
+
+Apply and verify:
+```bash
+mefctl restart mefdaemon
+journalctl -u mefdaemon -f
+```
+
+Expected runtime logs:
+- `port scan source=conntrack active` (or `source=journal active` fallback)
+- `[PORTSCAN] ... HIT ... unique_ports=X/Y`
+- `[PORTSCAN] ... BAN ...` after threshold is exceeded
+- Optional `[PORTSCAN] ... PERM_BAN ...` when escalation threshold is reached
+
+Expected `mef.log` BAN entries (when `ban_log_enabled=true`):
+- `RULE=PORTSCAN | SOURCE=CONNTRACK | BAN | ip=...`
+- Optional escalation: `RULE=PORTSCAN | SOURCE=CONNTRACK | PERM_BAN | ip=...`
+
+Quick checks:
+```bash
+command -v conntrack
+journalctl -u mefdaemon -n 100 --no-pager | grep -E "port scan source=|PORTSCAN"
+grep "RULE=PORTSCAN" /var/log/mef.log
+```
+
+Firewall verification examples:
+```bash
+# nftables backend
+nft list set inet mef mefbanned_v4
+nft list set inet mef mefbanned_v6
+
+# permanent blacklist set (if escalation triggered)
+nft list set inet mef mefpermbanned_v4
+nft list set inet mef mefpermbanned_v6
+```
+
+Notes:
+- `mefctl reload mefdaemon` reloads config only; use `restart` after binary upgrades.
+- Whitelist is always checked before PSD counting/banning.
+- FreeBSD currently runs PSD as no-op (Linux-only in this version).
 
 ## Whitelist
 Whitelist files are read from `/etc/mef/whitelist/*.conf` (configurable via `whitelist_dir`).
