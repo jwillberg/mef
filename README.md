@@ -461,4 +461,4 @@ Keeping the code well-documented is important for this project. Please add clear
 
 linux firewall, nftables, iptables, fail2ban alternative, intrusion prevention,
 ip blocking, log monitoring, ssh protection, postfix protection,
-systemd firewall service, freebsd firewall daemon
+systemd firewall service, freebsd firewall daemon, csf
