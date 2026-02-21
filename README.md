@@ -202,7 +202,7 @@ Notes:
 - `bans list --ips-only` prints only unique IP/CIDR values.
 - `bans list --verbose` prints raw backend rows with source set.
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
-- Binary download prefers GitHub Release asset URLs and falls back to raw tag/main URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`, `github.com/.../raw/refs/heads/main/bin/...`) when assets are unavailable.
+- Binary download prefers `updates.json` platform asset URLs (raw tag paths) and falls back to raw tag/main URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`, `github.com/.../raw/refs/heads/main/bin/...`) when needed.
 - `update --version X.Y.Z` installs a specific version.
 - Version pinning is bounded by metadata: `min_version <= X.Y.Z <= latest_version`.
 - Downgrade requires `--force`.
