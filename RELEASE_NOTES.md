@@ -8,6 +8,8 @@
 - PS: when `ps_enabled=true` and `ps_packet_udp=true`, auto-manage `/etc/mef/whitelist/auto-whitelist.conf` using detected DNS resolvers, default-route gateways (IPv4/IPv6), and DHCP server IPs to reduce UDP false positives.
 - mefctl: `update` now uses `updates.json` platform asset URL as primary binary source (instead of probing GitHub `releases/download` first), avoiding noisy 404 + fallback logs when release assets are not used.
 - release: add `update.sh` legacy updater script for environments where `mefctl update` is unavailable; supports `--force` and pinned `--version`.
+- mefdaemon: add optional `community_report=true/false` (default `false`) for batched JSON community reporting (60s interval) with fields `server_id` (`sha256(server_ip + hardware_id)`), `client_ip`, `service`, and `timestamp`; startup now logs `community reporting disabled/enabled`.
+- mefdaemon: community reporting startup enabled log now shows batch interval + shortened `server_id`. Report delivery failures are silent and never affect local ban behavior.
 
 ## v1.0.2 - 2026-02-21
 - PS: fix conntrack ENOBUFS event loss by passing `--buffer-size` to `conntrack -E` and adding configurable `ps_conntrack_buffer_size` (default 8388608 bytes).

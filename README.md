@@ -284,6 +284,7 @@ Global config (INI-style):
 - `debug_log` (log file path when debug is enabled, default `/tmp/mef.txt`)
 - `ban_log_enabled` (enable dedicated BAN audit log, default `false`)
 - `ban_log_path` (BAN audit log path, default `/var/log/mef.log`)
+- `community_report` (optional community reporting for structured ban indicators, default `false`; startup logs `community reporting disabled/enabled`; enabled mode logs batch interval + short server ID; delivery is best-effort/non-blocking and does not affect local bans)
 - `clear_bans_on_stop` (flush active ban sets when daemon stops, default `false`)
 - `journal_since` (default `2 min ago`)
 - `ps_enabled` (enable Port Scan Detection, Linux-only in current version)
@@ -454,6 +455,58 @@ permanent_threshold=5
 
 Keep other service rules with `escalation_enabled=false`.
 
+## Community Reporting (Optional)
+
+mef includes an optional community reporting feature that can contribute structured security indicators to the Malware.Expert - Attack Intelligence database.
+
+### Disabled by Default
+
+Community reporting is **disabled by default**.
+It must be explicitly enabled by the system administrator.
+
+All firewall decisions and bans are always executed locally.
+Enabling community reporting does not affect local ban logic.
+
+Participation is voluntary and independent from core firewall functionality.
+
+### Data Transmitted (When Enabled)
+
+If enabled, the following structured data may be transmitted:
+
+- Attacker IP address
+- Service identifier (e.g. ssh, nginx, postfix, portscan)
+- Timestamp (last seen)
+- Pseudonymous reporter identifier (one-way hash)
+
+The reporter identifier is generated locally.
+Malware.Expert receives only the hash value, never the underlying server identifier.
+
+### Data NOT Transmitted
+
+mef does NOT transmit:
+
+- Raw log entries
+- Usernames
+- Authentication attempts
+- Message contents
+- Target server IP addresses
+- Application payload data
+
+### Purpose
+
+Submitted data is used solely for:
+
+- Aggregating malicious IP intelligence
+- Improving automated threat detection
+- Providing an IP reputation feed for legitimate security purposes
+
+### Privacy & Legal
+
+See:
+
+- Privacy Notice: https://malware.expert/privacy-notice/
+- Terms of Service: https://malware.expert/terms-of-service/
+
 ## Code documentation
 Keeping the code well-documented is important for this project. Please add clear file headers and comments for non-obvious logic so future maintenance and search are easy.
 
@@ -462,3 +515,7 @@ Keeping the code well-documented is important for this project. Please add clear
 linux firewall, nftables, iptables, fail2ban alternative, intrusion prevention,
 ip blocking, log monitoring, ssh protection, postfix protection,
 systemd firewall service, freebsd firewall daemon, csf
+
+## Disclaimer
+
+Threat intelligence data (if used) is provided "as is" without warranties of accuracy, completeness, or fitness for a particular purpose.

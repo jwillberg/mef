@@ -4,33 +4,33 @@
   "assets": {
     "linux_amd64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_linux_amd64",
-      "sha256": "f62faf2db162a8d570371c295eed5001541c28d2b6f62dc19bca0e2889b4bc8a",
-      "size": 4183852
+      "sha256": "72e29e250923b8be3259211b3e4458cb22fce3de90f9418af384bde3088a41cd",
+      "size": 4224424
     },
     "linux_arm64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_linux_arm64",
-      "sha256": "68a9f5759dec865012c3cd23c249a0384fdaada0787b1addd0ffc8496008368d",
-      "size": 3107180
+      "sha256": "78e725b8f0fdd534607afaab597997a03de709aad11932c7cf7392da9266d14d",
+      "size": 3119824
     },
     "darwin_amd64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_darwin_amd64",
-      "sha256": "2fe510bafa23f4417425749956212235f7bac378f9f279da620f8448a42efa6f",
-      "size": 12930784
+      "sha256": "4a274e298e97c79ed6176c14f5df3012fb9819bf6b105e1ba456eb1db775a860",
+      "size": 13049840
     },
     "darwin_arm64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_darwin_arm64",
-      "sha256": "c1970758bf2e83274a55f218f56525632671168fb7819e0debe0d4de6d86047d",
-      "size": 10599186
+      "sha256": "21e2a68f05138b4f6912fe5dcc1306ab5fb44a41b1c879069c7d13932acde5ff",
+      "size": 10666834
     },
     "freebsd_amd64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_freebsd_amd64",
-      "sha256": "16d86d0c6165204dc501cfbbb631528891431240feb0971a148a0b2be1e2df7f",
-      "size": 12599454
+      "sha256": "51bbf0ebcac2e193712cf7f05753d6aa08ad5052b71732efce6f4a38ada87bf1",
+      "size": 12591262
     },
     "freebsd_arm64": {
       "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.3/bin/mefdaemon_freebsd_arm64",
-      "sha256": "48e527b121dc954b913da393bbd0ab298d719711e554fd836c855d2236288fa0",
-      "size": 10223774
+      "sha256": "67220c899ebe5e1722ea66e990a45774dafd341f0cb16a97394f1557c21d3edf",
+      "size": 10354846
     }
   }
 }
