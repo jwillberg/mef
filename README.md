@@ -66,7 +66,7 @@ The daemon maintains in-memory IP sets and updates firewall rules dynamically.
 ### Quick install (after extract)
 ```bash
 cd /tmp/mef-release
-chmod +x install.sh uninstall.sh
+chmod +x install.sh update.sh uninstall.sh
 sudo ./install.sh
 
 # After install - both services are DISABLED by default
@@ -86,6 +86,13 @@ mefctl status
 For uninstall:
 ```bash
 sudo ./uninstall.sh
+```
+
+Legacy update script (for older installs without `mefctl update`):
+```bash
+sudo ./update.sh
+sudo ./update.sh --force
+sudo ./update.sh --version 1.0.3 --force
 ```
 
 ### Download & extract (example)
