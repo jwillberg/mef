@@ -186,6 +186,7 @@ mefctl start   <mef|mefdaemon>
 mefctl stop    <mef|mefdaemon>
 mefctl reload  <mef|mefdaemon>
 mefctl restart <mef|mefdaemon>
+mefctl update [--force] [--version X.Y.Z]  # Install release binaries to /usr/local/sbin
 ```
 
 Notes:
@@ -200,6 +201,11 @@ Notes:
 - `bans list` (default) groups output to `Runtime`, `Permanent`, `Per-Rule`, and `Other` sections.
 - `bans list --ips-only` prints only unique IP/CIDR values.
 - `bans list --verbose` prints raw backend rows with source set.
+- `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
+- `update --version X.Y.Z` installs a specific version.
+- Version pinning is bounded by metadata: `min_version <= X.Y.Z <= latest_version`.
+- Downgrade requires `--force`.
+- `update` requires root privileges.
 
 ### mefctl Options
 ```bash
@@ -229,6 +235,10 @@ bans delete
 bans list
   --ips-only
   --verbose
+
+update
+  --force
+  --version <X.Y.Z>
 ```
 
 ### systemctl/service management
