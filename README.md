@@ -91,7 +91,7 @@ sudo ./uninstall.sh
 ### Download & extract (example)
 ```bash
 # Replace URL and archive name as needed
-curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.1/mef-release.tar.gz
+curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.2/mef-release.tar.gz
 tar -xzf mef-release.tar.gz -C /tmp
 cd /tmp/mef-release
 ```
@@ -169,9 +169,9 @@ mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
   clear --all --force            # Skip confirmation
 
 mefctl bans <action>
-  list                           # List current bans
+  list                           # List current bans grouped by category/set
   add <IP[/CIDR]>                # Add manual ban
-  delete <IP[/CIDR]>             # Delete manual ban
+  delete <IP[/CIDR]>             # Delete runtime ban (use --permanent for persistent removal)
   clear                          # Clear mefdaemon bans only
 
 mefctl lists <type>
@@ -194,6 +194,12 @@ Notes:
 - `rules validate` is recommended before `rules apply`.
 - `rules migrate` reads running nftables rules and prints mef.rules text to stdout by default.
 - `rules migrate` excludes the mef.conf managed nft table by default.
+- `bans add --permanent` writes to `blacklist_dir/*.conf` and survives reboot.
+- `bans delete` removes runtime ban sets only.
+- `bans delete --permanent` also removes from permanent sets and `blacklist_dir/*.conf`.
+- `bans list` (default) groups output to `Runtime`, `Permanent`, `Per-Rule`, and `Other` sections.
+- `bans list --ips-only` prints only unique IP/CIDR values.
+- `bans list --verbose` prints raw backend rows with source set.
 
 ### mefctl Options
 ```bash
@@ -214,8 +220,14 @@ rules migrate
 bans add
   --timeout <duration>
   --ports <port[,port,...]>
+  --permanent
+
+bans delete
+  --ports <port[,port,...]>
+  --permanent
 
 bans list
+  --ips-only
   --verbose
 ```
 
@@ -258,12 +270,19 @@ Global config (INI-style):
 - `journal_since` (default `2 min ago`)
 - `ps_enabled` (enable Port Scan Detection, Linux-only in current version)
 - `ps_limit` (ban threshold for unique destination ports within interval)
-- `ps_interval` (PSD sliding window, Go duration or integer seconds)
-- `ps_bantime` (PSD temporary ban duration, Go duration or integer seconds)
-- `ps_source_order` (source priority list, default `conntrack,journal`)
-- `ps_escalation_enabled` (enable PSD second-stage permanent blacklist escalation)
-- `ps_escalation_window` (PSD escalation window)
-- `ps_permanent_threshold` (first-stage PSD bans before permanent blacklist)
+- `ps_interval` (PS sliding window, Go duration or integer seconds)
+- `ps_bantime` (PS temporary ban duration, Go duration or integer seconds)
+- `ps_interface` (PS interface filter: `auto`, single interface like `eth0`, or CSV like `eth0,eth1`)
+- `ps_interface_exclude` (PS interface exclude list, default `lo`; supports `lo` or `lo,eth1`)
+- `ps_stats` (emit periodic PS stats logs while source is active, default `true`)
+- `ps_stats_interval` (PS stats log interval, default `30s`; supports `30s`, `1m`, `5m` or integer seconds)
+- `ps_exclude_ports` (exclude destination ports from PS counting; default `auto`: `auto`, manual `22,443,100-500`, or combined `auto,22,443`)
+- `ps_exclude_ports_refresh` (refresh interval for `ps_exclude_ports=auto`, default `1m`)
+- `ps_source_order` (source priority list, default `packet,conntrack,journal`)
+- `ps_packet_udp` (include UDP in `packet` source tracking, default `false`; when `false`, packet source tracks only TCP `SYN && !ACK`)
+- `ps_escalation_enabled` (enable PS second-stage permanent blacklist escalation)
+- `ps_escalation_window` (PS escalation window)
+- `ps_permanent_threshold` (first-stage PS bans before permanent blacklist)
 - `file_recent_limit` (startup cap for `source=file` matched logs, default `200`, `0` = disabled)
 - `file_recent_window` (startup recency window for `source=file`, default `24h`, `0` = disabled)
 - `firewall_backend` (`auto` | `nftables` | `iptables`)
@@ -276,21 +295,22 @@ Global config (INI-style):
 - `firewall_log_prefix` (LOG prefix, default `MEF_`)
 - `firewall_log_level` (LOG level, default `warn`)
 
-## Port Scan Detection (PSD)
+## Port Scan Detection (PS)
 
-PSD is a global detector (not a per-service `rules.d` rule):
+PS is a global detector (not a per-service `rules.d` rule):
 - Detects source IPs that hit many **different destination ports** in a short window.
 - Intended for port scanning behavior (`ps_limit` + `ps_interval`).
 - Not intended to replace service-specific brute-force detection on a single port (SSH/SMTP/HTTP), which still belongs in `rules.d` failregex rules.
 
-Linux v1 source order:
-- Primary: `conntrack`
-- Fallback: `journal` (requires firewall logging and matching prefix)
+Linux v1 source order (default):
+- Primary: `packet` (raw socket, requires `CAP_NET_RAW`; default tracks TCP `SYN && !ACK`, optional UDP via `ps_packet_udp=true`)
+- Fallback: `conntrack`
+- Last fallback: `journal` (requires firewall logging and matching prefix)
 
-Linux package prerequisite for primary source:
+Linux package prerequisite for `conntrack` source:
 - Debian/Ubuntu: `apt install conntrack`
 - RHEL/Rocky/Alma/Fedora: `dnf install conntrack-tools` (or `yum install conntrack-tools`)
-- If not installed, PSD can still run with journal fallback (`firewall_log_enabled=true`).
+- If not installed, PS can still run with `packet` source (if `CAP_NET_RAW` is available) or journal fallback (`firewall_log_enabled=true`).
 
 Recommended test config (`/etc/mef/mef.conf`):
 ```ini
@@ -298,7 +318,14 @@ ps_enabled=true
 ps_limit=10
 ps_interval=300
 ps_bantime=3600
-ps_source_order=conntrack,journal
+ps_interface=auto
+ps_interface_exclude=lo
+ps_stats=true
+ps_stats_interval=1m
+ps_exclude_ports=auto,22,443
+ps_exclude_ports_refresh=1m
+ps_source_order=packet,conntrack,journal
+ps_packet_udp=false
 ps_escalation_enabled=true
 ps_escalation_window=24h
 ps_permanent_threshold=3
@@ -311,14 +338,15 @@ journalctl -u mefdaemon -f
 ```
 
 Expected runtime logs:
-- `port scan source=conntrack active` (or `source=journal active` fallback)
+- `port scan source=packet active` (or `source=conntrack` / `source=journal` fallback)
+- `port scan excluded ports active=22,25,53,80,443` (example)
 - `[PORTSCAN] ... HIT ... unique_ports=X/Y`
 - `[PORTSCAN] ... BAN ...` after threshold is exceeded
 - Optional `[PORTSCAN] ... PERM_BAN ...` when escalation threshold is reached
 
 Expected `mef.log` BAN entries (when `ban_log_enabled=true`):
-- `RULE=PORTSCAN | SOURCE=CONNTRACK | BAN | ip=...`
-- Optional escalation: `RULE=PORTSCAN | SOURCE=CONNTRACK | PERM_BAN | ip=...`
+- `RULE=PORTSCAN | SOURCE=PACKET | BAN | ip=... | bantime=1h | action=ban | msg="unique_ports=11 limit=10 interval=5m ports=22,25,80,443,..."`
+- Optional escalation: `RULE=PORTSCAN | SOURCE=PACKET | PERM_BAN | ip=...`
 
 Quick checks:
 ```bash
@@ -340,8 +368,15 @@ nft list set inet mef mefpermbanned_v6
 
 Notes:
 - `mefctl reload mefdaemon` reloads config only; use `restart` after binary upgrades.
-- Whitelist is always checked before PSD counting/banning.
-- FreeBSD currently runs PSD as no-op (Linux-only in this version).
+- Whitelist is always checked before PS counting/banning.
+- FreeBSD currently runs PS as no-op (Linux-only in this version).
+- `ps_interface=auto` selects default-route interface(s); explicit lists (`eth0,eth1`) restrict PS to those interfaces.
+- `ps_interface_exclude` removes interfaces from tracking (default `lo`, so loopback is excluded by default).
+- `ps_stats=false` disables periodic `port scan stats ...` log lines.
+- `ps_stats_interval` controls stats frequency; counters are runtime-only and reset on daemon/source restart.
+- `ps_exclude_ports=auto` detects local listening server ports (TCP+UDP) and excludes them from PS counting.
+- `ps_packet_udp=true` enables UDP tracking for `packet` source; keep it `false` if you only want TCP SYN-based detection.
+- Specific bind IPs (including public IPs) are matched against `ps_interface`/`ps_interface_exclude`; `0.0.0.0`/`::` applies to tracked interfaces.
 
 ## Whitelist
 Whitelist files are read from `/etc/mef/whitelist/*.conf` (configurable via `whitelist_dir`).
