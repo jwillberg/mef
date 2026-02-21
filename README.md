@@ -91,7 +91,7 @@ sudo ./uninstall.sh
 ### Download & extract (example)
 ```bash
 # Replace URL and archive name as needed
-curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.2/mef-release.tar.gz
+curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.3/mef-release.tar.gz
 tar -xzf mef-release.tar.gz -C /tmp
 cd /tmp/mef-release
 ```
@@ -202,6 +202,7 @@ Notes:
 - `bans list --ips-only` prints only unique IP/CIDR values.
 - `bans list --verbose` prints raw backend rows with source set.
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
+- Binary download prefers GitHub Release asset URLs and falls back to raw tag/main URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`, `github.com/.../raw/refs/heads/main/bin/...`) when assets are unavailable.
 - `update --version X.Y.Z` installs a specific version.
 - Version pinning is bounded by metadata: `min_version <= X.Y.Z <= latest_version`.
 - Downgrade requires `--force`.
@@ -289,7 +290,7 @@ Global config (INI-style):
 - `ps_exclude_ports` (exclude destination ports from PS counting; default `auto`: `auto`, manual `22,443,100-500`, or combined `auto,22,443`)
 - `ps_exclude_ports_refresh` (refresh interval for `ps_exclude_ports=auto`, default `1m`)
 - `ps_source_order` (source priority list, default `packet,conntrack,journal`)
-- `ps_packet_udp` (include UDP in `packet` source tracking, default `false`; when `false`, packet source tracks only TCP `SYN && !ACK`)
+- `ps_packet_udp` (include UDP in `packet` source tracking, default `false`; when `true`, mefdaemon auto-manages `/etc/mef/whitelist/auto-whitelist.conf` with DNS resolvers, default gateways, and DHCP server IPs to reduce false positives)
 - `ps_escalation_enabled` (enable PS second-stage permanent blacklist escalation)
 - `ps_escalation_window` (PS escalation window)
 - `ps_permanent_threshold` (first-stage PS bans before permanent blacklist)
@@ -385,7 +386,8 @@ Notes:
 - `ps_stats=false` disables periodic `port scan stats ...` log lines.
 - `ps_stats_interval` controls stats frequency; counters are runtime-only and reset on daemon/source restart.
 - `ps_exclude_ports=auto` detects local listening server ports (TCP+UDP) and excludes them from PS counting.
-- `ps_packet_udp=true` enables UDP tracking for `packet` source; keep it `false` if you only want TCP SYN-based detection.
+- `ps_packet_udp=true` enables UDP tracking for `packet` source and auto-generates `/etc/mef/whitelist/auto-whitelist.conf` (resolvers, gateways, DHCP servers).
+- If `ps_packet_udp` is disabled (or PS is disabled), that auto-generated whitelist file is removed.
 - Specific bind IPs (including public IPs) are matched against `ps_interface`/`ps_interface_exclude`; `0.0.0.0`/`::` applies to tracked interfaces.
 
 ## Whitelist
@@ -403,6 +405,7 @@ Comments are allowed:
 - Inline comments, e.g. `1.2.3.4 # office`
 
 Whitelist entries are loaded into memory and reloaded periodically (default `1m`, configurable via `whitelist_reload`).
+- Reserved auto-managed file: `/etc/mef/whitelist/auto-whitelist.conf` (created only when `ps_enabled=true` and `ps_packet_udp=true`).
 
 ## Blacklist
 Blacklist files are read from `/etc/mef/blacklist/*.conf` (configurable via `blacklist_dir`).

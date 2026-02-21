@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v1.0.3 - 2026-02-21
+- mefctl: harden `update` metadata fetch with retries and fallback URLs to reduce transient `updates.json` timeout failures (`Client.Timeout exceeded while awaiting headers`).
+- mefctl: fix `update` binary download 404s by adding fallback to tag raw binary URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`) and main-branch raw URLs when GitHub Release asset URL is missing.
+- PS: when `ps_enabled=true` and `ps_packet_udp=true`, auto-manage `/etc/mef/whitelist/auto-whitelist.conf` using detected DNS resolvers, default-route gateways (IPv4/IPv6), and DHCP server IPs to reduce UDP false positives.
+
 ## v1.0.2 - 2026-02-21
 - PS: fix conntrack ENOBUFS event loss by passing `--buffer-size` to `conntrack -E` and adding configurable `ps_conntrack_buffer_size` (default 8388608 bytes).
 - PS: add Linux `packet` source (`ps_source_order=packet,...`) to detect TCP `SYN && !ACK` directly from kernel raw packet socket without conntrack CLI or firewall log rules (requires `CAP_NET_RAW`).
