@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## v1.0.4 - 2026-02-22
+- mefdaemon: add optional dynamic RBL/DNSBL profiles (`rbl_<key>_*`, key `[a-z0-9]+`) with async fail-open DNS lookups, per-profile cache (`positive_ttl`, `negative_ttl`, `error_ttl`), and port-scoped bans.
+- mefdaemon: add normalized RBL BAN logging (`RULE=RBL | SOURCE=DNS | BAN | ... | profile=<key> | msg="zone=... answer=..."`) and use stable community reporting `service=rbl` for all non-cloud RBL profiles (profile context stays in `details.zone`).
+- mefdaemon: extend RBL BAN `msg` with trigger context fields when available: `src`, `dport`, `proto`, `dst`, `iface`.
+- mefdaemon: trigger RBL checks also from `rules.d/*` match hits (`source=file` and `source=journal`) when `rbl_enabled=true` (not only from PS source stream).
+- mefdaemon: set default RBL profile to `rbl_blocklist_*` (`zone=bl.blocklist.de`).
+- mefdaemon: add `community_cloud_protection=true/false` (requires `community_report=true`) for Malware.Expert DNS cloud checks (`RULE=CLOUD | SOURCE=DNS`) and keep community reporting endpoint fixed.
+- mefdaemon: align community reporting transport with cloud ingress API and support both single-event object and multi-event array submissions.
+- mefdaemon: add `details` JSON object to community reporting payload with strict per-rule mapping (default `{}`); currently `RBL/CLOUD -> zone,answer,dport` and `PORTSCAN -> ports,interval,limit`.
+- mefdaemon: improve community reporting delivery resilience with transient retries and DNS multi-IP dial failover attempts.
+- docs/config: expose `community_cloud_*` tuning keys in public `mef.conf` template and README (`ports`, `bantime`, `timeout`, `positive_ttl`, `negative_ttl`, `error_ttl`).
+- mefdaemon: allow startup without enabled `rules.d` rules (or even without `*.conf` files); daemon now runs with rule watchers disabled and keeps global detectors (PS/RBL/CLOUD) available when enabled.
+- PS/packet: optimize hot path CPU usage by caching `ifindex -> ifname` lookups in packet source reader.
+- PS/packet: drop `PACKET_OUTGOING` frames before packet parsing to avoid processing host-originated egress traffic.
+- PS: add debug fast-path gating so disabled debug mode avoids expensive formatting/mutex work in high-frequency event loops.
+- PS/packet: build `event.Raw` payload only when debug is enabled.
+- PS/packet: bind packet sockets to resolved `ps_interface` set (when not `all`), attach kernel cBPF filter (TCP SYN, optional UDP, VLAN-aware) with `ps_exclude_ports` support, and hot-reload packet source when interface/auto-exclude ports change.
+- PS/debug: reduce duplicate packet `HIT` logs by emitting `HIT` only when a new unique destination port is observed; repeated same-port SYNs are now counted in `port scan stats` as `repeat_port`.
+
 ## v1.0.3 - 2026-02-21
 - mefctl: harden `update` metadata fetch with retries and fallback URLs to reduce transient `updates.json` timeout failures (`Client.Timeout exceeded while awaiting headers`).
 - mefctl: fix `update` binary download 404s by adding fallback to tag raw binary URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`) and main-branch raw URLs when GitHub Release asset URL is missing.

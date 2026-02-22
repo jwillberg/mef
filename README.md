@@ -92,14 +92,15 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.3 --force
+sudo ./update.sh --version 1.0.4 --force
 ```
 
 ### Download & extract (example)
 ```bash
-# Replace URL and archive name as needed
-curl -LO https://github.com/jwillberg/mef/releases/download/v1.0.3/mef-release.tar.gz
-tar -xzf mef-release.tar.gz -C /tmp
+# Replace URL/version as needed
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.4.tar.gz
+mkdir -p /tmp/mef-release
+tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
 ```
 
@@ -266,6 +267,7 @@ service mefdaemon reload      # Reload daemon config
 ## Config
 - Global config: `/etc/mef/mef.conf`
 - Per-service rules: `/etc/mef/rules.d/*.conf`
+- Startup behavior: mefdaemon now starts even when `rules.d` has no enabled rules (or no rule files). In that mode, only global detectors/features (PS, RBL, CLOUD) run if enabled.
 
 Rule note (`source=journal`):
 - `programs` supports exact names and wildcards, e.g. `sshd`, `sshd*`, `postfix/*`, or `*`.
@@ -284,7 +286,24 @@ Global config (INI-style):
 - `debug_log` (log file path when debug is enabled, default `/tmp/mef.txt`)
 - `ban_log_enabled` (enable dedicated BAN audit log, default `false`)
 - `ban_log_path` (BAN audit log path, default `/var/log/mef.log`)
-- `community_report` (optional community reporting for structured ban indicators, default `false`; startup logs `community reporting disabled/enabled`; enabled mode logs batch interval + short server ID; delivery is best-effort/non-blocking and does not affect local bans)
+- `community_report` (optional community reporting for structured ban indicators, default `false`; startup logs `community reporting disabled/enabled`; enabled mode logs batch interval + short server ID; delivery is best-effort/non-blocking, includes transient retry attempts, and does not affect local bans)
+- `community_cloud_protection` (optional cloud DNS protection, default `false`; requires `community_report=true`; emits `RULE=CLOUD | SOURCE=DNS` bans)
+- `community_cloud_ports` (cloud DNS protection port scope: `all`, `22,443`, `100-2000`; default `all`)
+- `community_cloud_bantime` (cloud DNS protection ban duration, default `1h`)
+- `community_cloud_timeout` (cloud DNS lookup timeout, default `2s`)
+- `community_cloud_positive_ttl` (cloud DNS cache TTL for listed results, default `1h`)
+- `community_cloud_negative_ttl` (cloud DNS cache TTL for not-listed results, default `15m`)
+- `community_cloud_error_ttl` (cloud DNS cache TTL for lookup errors/timeouts, default `30s`)
+- `rbl_enabled` (enable optional DNSBL checks, default `false`)
+- `rbl_<key>_enabled` (enable profile, key uses `[a-z0-9]+`)
+- `rbl_<key>_zone` (DNSBL zone, default profile uses `bl.blocklist.de`)
+- `rbl_<key>_answer_match` (response IP glob list, e.g. `127.0.0.*,127.*,*`)
+- `rbl_<key>_ports` (port scope: `all`, `22,443`, `100-2000`)
+- `rbl_<key>_bantime` (RBL ban duration)
+- `rbl_<key>_timeout` (DNS lookup timeout)
+- `rbl_<key>_positive_ttl` (cache TTL for listed results)
+- `rbl_<key>_negative_ttl` (cache TTL for not-listed results)
+- `rbl_<key>_error_ttl` (cache TTL for lookup errors/timeouts)
 - `clear_bans_on_stop` (flush active ban sets when daemon stops, default `false`)
 - `journal_since` (default `2 min ago`)
 - `ps_enabled` (enable Port Scan Detection, Linux-only in current version)
@@ -323,6 +342,7 @@ PS is a global detector (not a per-service `rules.d` rule):
 
 Linux v1 source order (default):
 - Primary: `packet` (raw socket, requires `CAP_NET_RAW`; default tracks TCP `SYN && !ACK`, optional UDP via `ps_packet_udp=true`)
+- `packet` source uses kernel-level cBPF prefiltering and (when `ps_interface` is not `all`) binds sockets to resolved interface set; filter/socket set is reloaded automatically when `ps_interface` or auto `ps_exclude_ports` resolution changes.
 - Fallback: `conntrack`
 - Last fallback: `journal` (requires firewall logging and matching prefix)
 
@@ -359,7 +379,7 @@ journalctl -u mefdaemon -f
 Expected runtime logs:
 - `port scan source=packet active` (or `source=conntrack` / `source=journal` fallback)
 - `port scan excluded ports active=22,25,53,80,443` (example)
-- `[PORTSCAN] ... HIT ... unique_ports=X/Y`
+- `[PORTSCAN] ... HIT ... unique_ports=X/Y` (only when a new unique destination port is observed)
 - `[PORTSCAN] ... BAN ...` after threshold is exceeded
 - Optional `[PORTSCAN] ... PERM_BAN ...` when escalation threshold is reached
 
@@ -393,10 +413,42 @@ Notes:
 - `ps_interface_exclude` removes interfaces from tracking (default `lo`, so loopback is excluded by default).
 - `ps_stats=false` disables periodic `port scan stats ...` log lines.
 - `ps_stats_interval` controls stats frequency; counters are runtime-only and reset on daemon/source restart.
+- Stats include `repeat_port` for repeated same-port events that do not increase `unique_ports`.
 - `ps_exclude_ports=auto` detects local listening server ports (TCP+UDP) and excludes them from PS counting.
 - `ps_packet_udp=true` enables UDP tracking for `packet` source and auto-generates `/etc/mef/whitelist/auto-whitelist.conf` (resolvers, gateways, DHCP servers).
 - If `ps_packet_udp` is disabled (or PS is disabled), that auto-generated whitelist file is removed.
 - Specific bind IPs (including public IPs) are matched against `ps_interface`/`ps_interface_exclude`; `0.0.0.0`/`::` applies to tracked interfaces.
+
+## RBL (DNSBL)
+
+RBL is optional and can trigger from:
+- PS source pipeline (`packet` / `conntrack` / `journal` firewall logs)
+- `rules.d/*` rule hits (`source=journal` and `source=file`)
+
+- Runs asynchronously (fail-open); lookup latency does not block local detection flow.
+- Uses per-profile cache (`positive_ttl`, `negative_ttl`, `error_ttl`) and pending-query deduplication.
+- Supports multiple profiles via dynamic keys: `rbl_<key>_*` (key: `[a-z0-9]+`).
+- Supports port-scoped bans per profile via `rbl_<key>_ports`.
+- PS source stack is Linux-only; `rules.d` trigger path works with normal rule sources (`file` / `journal`).
+- Apply RBL config changes with `mefctl restart mefdaemon` (reload alone does not restart source workers).
+- Malware.Expert cloud DNS profile is handled via `community_cloud_protection=true` (logged as `RULE=CLOUD`), not via `rbl_<key>_zone`.
+
+Default profile (`blocklist`) in `/etc/mef/mef.conf`:
+```ini
+rbl_enabled=true
+rbl_blocklist_enabled=true
+rbl_blocklist_zone=bl.blocklist.de
+rbl_blocklist_answer_match=127.0.0.*,127.*,*
+rbl_blocklist_ports=all
+rbl_blocklist_bantime=1h
+rbl_blocklist_timeout=2s
+rbl_blocklist_positive_ttl=1h
+rbl_blocklist_negative_ttl=15m
+rbl_blocklist_error_ttl=30s
+```
+
+Expected `mef.log` RBL BAN entry:
+- `RULE=RBL | SOURCE=DNS | BAN | ip=1.2.3.4 | bantime=1h | action=ban | profile=blocklist | msg="zone=bl.blocklist.de answer=127.0.0.2 src=1.2.3.4 dport=22 proto=tcp dst=95.217.31.237 iface=eth0"` (trigger context fields are included when available)
 
 ## Whitelist
 Whitelist files are read from `/etc/mef/whitelist/*.conf` (configurable via `whitelist_dir`).
@@ -468,15 +520,21 @@ All firewall decisions and bans are always executed locally.
 Enabling community reporting does not affect local ban logic.
 
 Participation is voluntary and independent from core firewall functionality.
+When enabled, reports are sent to a built-in cloud endpoint.
 
 ### Data Transmitted (When Enabled)
 
 If enabled, the following structured data may be transmitted:
 
 - Attacker IP address
-- Service identifier (e.g. ssh, nginx, postfix, portscan)
+- Service identifier (e.g. ssh, nginx, postfix, portscan, rbl, cloud)
 - Timestamp (last seen)
 - Pseudonymous reporter identifier (one-way hash)
+- Structured rule metadata (`details` JSON object; fields vary by detection type)
+  - `RBL` / `CLOUD`: `zone`, `answer`, `dport` (if available)
+  - `PORTSCAN`: `ports`, `interval`, `limit`
+  - Other services (e.g. `SSHD`): empty `{}` by default
+- Service normalization: all non-cloud RBL profiles use `service=rbl` (not `rbl_<key>`); cloud uses `service=cloud`.
 
 The reporter identifier is generated locally.
 Malware.Expert receives only the hash value, never the underlying server identifier.
