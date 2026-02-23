@@ -1,13 +1,16 @@
 # mef
 
-**mef (Malware.Expert Firewall)** is a lightweight Linux firewall and automatic IP ban engine.
+**mef (Malware.Expert Firewall)** is a lightweight Linux firewall and multi-layer automatic IP ban engine.
 
 It combines:
 - **Persistent firewall management** (nftables preferred, iptables fallback)
 - **Fail2ban-style log monitoring and automatic IP blocking**
+- **DNS-based RBL/DNSBL enforcement**
+- Optional **Community Cloud threat intelligence**
+- Built-in **Port Scan Detection (PS)**
 - Native **systemd / FreeBSD service integration**
 
-Designed as a simple, modern alternative to UFW, CSF and Fail2Ban stacks.
+Designed as a simple, modern alternative to UFW, CSF and Fail2Ban stacks, with additional DNS and community-driven protection layers.
 
 ## Two Independent Services
 
@@ -44,6 +47,10 @@ mef consists of two standalone services that work together or separately:
 - Journal **and** file log inputs (`source=journal/file`)
 - One clear config per service (no separate jail/filter)
 - Bans via nftables/iptables backends
+- Built-in **Port Scan Detection (PS)** with packet/conntrack/journal sources
+- **RBL/DNSBL profiles** with port-scoped bans
+- **Configurable RBL cache TTLs** (`positive_ttl`, `negative_ttl`, `error_ttl`)
+- Optional **Community Cloud protection** (`community_cloud_protection`)
 - Safe defaults, easy install
 
 ## Architecture
@@ -533,7 +540,7 @@ If enabled, the following structured data may be transmitted:
 - Structured rule metadata (`details` JSON object; fields vary by detection type)
   - `RBL` / `CLOUD`: `zone`, `answer`, `dport` (if available)
   - `PORTSCAN`: `ports`, `interval`, `limit`
-  - Other services (e.g. `SSHD`): empty `{}` by default
+  - Other services (e.g. `SSHD`): omitted when no structured details are available
 - Service normalization: all non-cloud RBL profiles use `service=rbl` (not `rbl_<key>`); cloud uses `service=cloud`.
 
 The reporter identifier is generated locally.
