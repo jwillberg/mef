@@ -99,13 +99,13 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.4 --force
+sudo ./update.sh --version 1.0.5 --force
 ```
 
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.4.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.5.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -186,7 +186,7 @@ mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
 mefctl bans <action>
   list                           # List current bans grouped by category/set
   add <IP[/CIDR]>                # Add manual ban
-  delete <IP[/CIDR]>             # Delete runtime ban (use --permanent for persistent removal)
+  delete <IP[/CIDR]>             # Delete ban (runtime by default)
   clear                          # Clear mefdaemon bans only
 
 mefctl lists <type>
@@ -212,8 +212,11 @@ Notes:
 - `rules migrate` excludes the mef.conf managed nft table by default.
 - `bans add --permanent` writes to `blacklist_dir/*.conf` and survives reboot.
 - `bans delete` removes runtime ban sets only.
-- `bans delete --permanent` also removes from permanent sets and `blacklist_dir/*.conf`.
+- `bans delete --permanent` removes only permanent sets and `blacklist_dir/*.conf`.
+- `bans delete --all` removes runtime + permanent sets and `blacklist_dir/*.conf`.
 - `bans list` (default) groups output to `Runtime`, `Permanent`, `Per-Rule`, and `Other` sections.
+- `bans list --permanent` shows only permanent sets.
+- `bans list --all` explicitly selects the default "all sets" mode.
 - `bans list --ips-only` prints only unique IP/CIDR values.
 - `bans list --verbose` prints raw backend rows with source set.
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
@@ -247,8 +250,11 @@ bans add
 bans delete
   --ports <port[,port,...]>
   --permanent
+  --all
 
 bans list
+  --permanent
+  --all
   --ips-only
   --verbose
 
@@ -352,6 +358,12 @@ Linux v1 source order (default):
 - `packet` source uses kernel-level cBPF prefiltering and (when `ps_interface` is not `all`) binds sockets to resolved interface set; filter/socket set is reloaded automatically when `ps_interface` or auto `ps_exclude_ports` resolution changes.
 - Fallback: `conntrack`
 - Last fallback: `journal` (requires firewall logging and matching prefix)
+
+Source behavior differences:
+- `packet` sees raw inbound packets early and catches scans against dropped/closed ports, but can use more CPU under heavy flood traffic.
+- `conntrack` is lighter but only sees flows that reach conntrack `NEW` tracking; scans against dropped/non-tracked ports may be invisible.
+- With `ps_exclude_ports=auto`, local listening service ports (for example `22,25,80,443,465,587`) are excluded from PS counting for all sources.
+- PS ban threshold is strict: ban triggers when `unique_ports > ps_limit` (not `>=`).
 
 Linux package prerequisite for `conntrack` source:
 - Debian/Ubuntu: `apt install conntrack`
@@ -482,6 +494,15 @@ Repo example blacklist: [conf/blacklist/example.conf](conf/blacklist/example.con
 Format: one entry per line (`IP` or `CIDR`).
 
 Blacklist entries are enforced as permanent bans and reloaded periodically (default `1m`, configurable via `blacklist_reload`).
+
+Set mapping:
+- `auto-permanent.conf` -> `mefpermbanned_v4` / `mefpermbanned_v6`
+- other `*.conf` files -> `mefbl_<filename>_v4` / `mefbl_<filename>_v6`
+
+Reload behavior:
+- reload is file-granular (only changed blacklist files are re-synced)
+- small changes use add/delete diff updates
+- large changes use atomic tmp+swap set sync with batched nft element loading
 
 Whitelist has precedence: if an address matches both, whitelist wins.
 
