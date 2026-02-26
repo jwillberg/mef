@@ -1,5 +1,22 @@
 # Release notes
 
+## Unreleased
+
+## v1.0.6 - 2026-02-26
+- config audit: add drift warnings for `mef.conf` keys; `mefdaemon` now logs missing/unknown `[global]` keys at startup/reload, and `mefctl config check [FILE]` reports the same audit on demand.
+- mefdaemon: add Linux permanent-blacklist fastpath framework with `blacklist_fastpath=auto|xdp|tc|disabled` and `blacklist_fastpath_xdp_mode=auto|native|generic`; runtime sync now writes status to `cache_dir/blacklist_fastpath_status.json` and `mefctl status` shows active/configured mode, interfaces, `entries_v4`, `entries_v6`, `prefixes`, and `last_sync`.
+- mefctl: add `status --verbose fastpath` target view for fastpath lifecycle/debug details (`kernel_table`, source-of-truth, restart/crash behavior, and fastpath management commands).
+- docs: update README + config template with fastpath operations and mefctl command usage (`status --verbose fastpath`, runtime/permanent ban management, emergency reset flow).
+- mefdaemon: add `tc` fastpath implementation for permanent blacklist sets (`mefpermbanned_*`, `mefbl_*`) via netdev ingress nft sets/chains; `auto` currently falls back to `tc` when XDP is unavailable.
+- mefdaemon: when fastpath is active, permanent blacklist enforcement is now single-path; nft permanent sets in `inet mef` are cleaned up to avoid duplicate active entries in both `inet mef` and `netdev mef_fastpath`.
+- PS/packet: add Linux eBPF socket-filter kernel drop v2 (IPv4 + IPv6, exact IP + CIDR via LPM trie) built from permanent blacklist + runtime timeout ban snapshots; already-blocked sources are dropped before userspace packet processing with live map diff updates (no packet-source restart for snapshot-only changes).
+- PS/packet: add userspace early blocked-IP skip path in packet reader (minimal parse + in-memory snapshot lookup) so packets from already blocked sources are discarded before event build/channel pipeline; periodic stats now expose `skip_banned_early`.
+- config: add `ps_packet_kernel_drop=true|false` (default `true`) to control packet-source blocked-IP kernel drop/early-skip path independently from blacklist fastpath (`blacklist_fastpath`).
+- mefctl: harden `bans add --permanent` with whitelist conflict guard; permanent entries overlapping whitelist CIDRs are now rejected.
+- mefctl: add `bans list --fastpath` for direct kernel fastpath visibility (`netdev mef_fastpath`) and make `bans list`/`bans list --permanent` always include permanent entries from `blacklist/*.conf` even when fastpath is the active enforcement path.
+- mefdaemon: add guarded heap trim on large blacklist shrink events (`sighup`/periodic reload) with cooldown/thresholds (`old>=10k`, `removed>=5k`, `drop>=25%`, cooldown `10m`) to return memory to OS without constant GC pressure.
+- docs: add explicit backend feature matrix (`nftables` vs `iptables`), valid-combo quick reference, and kernel datapath explanation for packet source copy-path behavior and related tuning (`ps_packet_kernel_drop`, `blacklist_fastpath`).
+
 ## v1.0.5 - 2026-02-25
 - mefdaemon: permanent blacklist sync is now file-aware. `auto-permanent.conf` stays on `mefpermbanned_v4/v6`, while other blacklist files map to dedicated dynamic sets `mefbl_<filename>_v4/v6`.
 - mefdaemon: `blacklist_reload` now applies per-file diffing; unchanged files are skipped and only changed files are re-synced.

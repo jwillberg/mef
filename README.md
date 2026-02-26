@@ -66,6 +66,105 @@ Firewall backends:
 
 The daemon maintains in-memory IP sets and updates firewall rules dynamically.
 
+## Backend Feature Matrix (nftables vs iptables)
+
+`Runtime timeout bans (mefbanned_*)`
+- nftables: Yes
+- iptables: Yes
+- Notes: Both are kernel-enforced.
+
+`Permanent blacklist sync (/etc/mef/blacklist/*.conf)`
+- nftables: Yes
+- iptables: Yes
+- Notes: Same source-of-truth files, different backend implementation.
+
+`Per-rule dynamic ban sets (banned_<rule>_*)`
+- nftables: Yes
+- iptables: Yes
+- Notes: Created on demand when rules trigger.
+
+`Fastpath (blacklist_fastpath)`
+- nftables: Yes (Linux, nft `netdev` table)
+- iptables: No
+- Notes: Requires `firewall_backend=nftables`.
+
+`mefctl bans list --fastpath`
+- nftables: Yes
+- iptables: No
+- Notes: Command is nft-only.
+
+`source=ipset:<name> in mef.rules`
+- nftables: No
+- iptables: Yes
+- Notes: Native nft backend does not support external ipset source references.
+
+`mefctl rules clear --all`
+- nftables: Yes
+- iptables: No
+- Notes: `--all` is nft-table destructive clear.
+
+`mefctl rules migrate`
+- nftables: Yes
+- iptables: Limited
+- Notes: Current migrate flow targets nft rulesets.
+
+Notes:
+- On many modern distros, `iptables` may run in `iptables-nft` compat mode. That is still treated as `iptables` backend behavior in mef.
+- For new distro targets, prefer `firewall_backend=nftables`; keep `iptables` as compatibility fallback.
+
+## Valid Configuration Combinations (Quick Reference)
+
+Use these as known-good combinations:
+
+`A) Full feature set (recommended)`
+- `firewall_backend=nftables`
+- `ps_source_order=packet,conntrack,journal`
+- `ps_packet_kernel_drop=true`
+- `blacklist_fastpath=auto` (or `tc` / `xdp`)
+- Result: packet visibility + blocked-IP optimization + optional ingress fastpath.
+
+`B) Lower PS CPU usage`
+- `firewall_backend=nftables`
+- `ps_source_order=conntrack,journal`
+- `blacklist_fastpath=auto` (optional)
+- Result: lighter userspace path, but less scan visibility than `packet`.
+
+`C) Compatibility mode`
+- `firewall_backend=iptables`
+- `ps_source_order=packet,conntrack,journal` (or subset)
+- `blacklist_fastpath=disabled` (effective behavior on iptables backend)
+- Result: core mef features work, fastpath is not active.
+
+`D) Minimal fallback`
+- `firewall_backend=nftables` or `iptables`
+- `ps_source_order=journal`
+- `firewall_log_enabled=true`
+- Result: PS/RBL fallback via firewall logs only.
+
+Important behavior notes:
+- `blacklist_fastpath=auto|xdp|tc` requires Linux + `firewall_backend=nftables`.
+- `ps_packet_kernel_drop` only affects runtime when `packet` exists in `ps_source_order`.
+- `mefctl bans list --fastpath` works only with nftables backend on Linux.
+
+## Kernel Data Path Notes (Why Packet Source Still Sees Traffic)
+
+When `ps_source_order` includes `packet`, mefdaemon reads traffic via Linux `AF_PACKET` raw socket.
+
+- `packet` source receives a packet copy in userspace.
+- Kernel firewall (`nft` / `iptables`) still enforces drop/accept in netfilter.
+- Because of the socket copy path, packet source can still consume CPU under flood even when source IP is already banned.
+
+Controls and behavior:
+
+- `ps_packet_kernel_drop=true` (default): enables packet-source blocked-IP optimization path (kernel socket filter + early userspace skip).
+- `ps_packet_kernel_drop=false`: packet source runs without blocked-IP kernel-drop optimization.
+- `blacklist_fastpath` (`auto|xdp|tc|disabled`) is a separate ingress fastpath layer and independent from `ps_packet_kernel_drop`.
+
+Practical guidance:
+
+- Highest flood resilience: `firewall_backend=nftables`, keep `ps_packet_kernel_drop=true`, and enable fastpath (`blacklist_fastpath=auto`/`tc`).
+- Lowest userspace PS CPU (with tradeoff in scan visibility): use `ps_source_order=conntrack,journal`.
+
 ## Install
 
 ⚠️ **IMPORTANT:** Both services are **disabled by default** to prevent accidental lockout. You must enable them manually after testing.
@@ -99,13 +198,13 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.5 --force
+sudo ./update.sh --version 1.0.6 --force
 ```
 
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.5.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.6.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -185,16 +284,22 @@ mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
 
 mefctl bans <action>
   list                           # List current bans grouped by category/set
-  add <IP[/CIDR]>                # Add manual ban
+                                 # Use --fastpath for kernel fastpath sets (nftables/Linux)
+  add <IP[/CIDR]>                # Add manual ban (runtime by default)
   delete <IP[/CIDR]>             # Delete ban (runtime by default)
-  clear                          # Clear mefdaemon bans only
+  clear                          # Clear runtime timeout ban sets (mefbanned_v4/v6)
 
 mefctl lists <type>
   whitelist                      # Show whitelist entries
-  blacklist                      # Show permanent blacklist entries
+  blacklist                      # Show file-based permanent blacklist entries
   recidive                       # Show persistent recidive counters
 
-mefctl status                    # Show service + firewall status
+mefctl config <action>
+  check [FILE]                   # Audit mef.conf [global] keys (missing/unknown)
+
+mefctl status [--verbose] [fastpath]
+                                 # Show service + firewall status
+                                 # fastpath target: fastpath-only lifecycle/debug view
 mefctl enable [mef|mefdaemon]
 mefctl disable [mef|mefdaemon]
 mefctl start   <mef|mefdaemon>
@@ -211,14 +316,21 @@ Notes:
 - `rules migrate` reads running nftables rules and prints mef.rules text to stdout by default.
 - `rules migrate` excludes the mef.conf managed nft table by default.
 - `bans add --permanent` writes to `blacklist_dir/*.conf` and survives reboot.
+- `bans add --permanent` rejects entries that overlap whitelist CIDRs.
 - `bans delete` removes runtime ban sets only.
 - `bans delete --permanent` removes only permanent sets and `blacklist_dir/*.conf`.
 - `bans delete --all` removes runtime + permanent sets and `blacklist_dir/*.conf`.
 - `bans list` (default) groups output to `Runtime`, `Permanent`, `Per-Rule`, and `Other` sections.
 - `bans list --permanent` shows only permanent sets.
 - `bans list --all` explicitly selects the default "all sets" mode.
+- `bans list --fastpath` shows kernel fastpath sets only (`netdev mef_fastpath`).
+- `bans list` and `bans list --permanent` include permanent entries from `blacklist_dir/*.conf` even when fastpath is active.
+- `bans list --fastpath` requires Linux + `nftables` backend (not available with `iptables` backend).
 - `bans list --ips-only` prints only unique IP/CIDR values.
 - `bans list --verbose` prints raw backend rows with source set.
+- `config check` audits `[global]` keys and reports missing known keys (defaults in effect) plus unknown keys (possible typo/legacy).
+- `--permanent` and `--all` are mutually exclusive.
+- `status --verbose fastpath` prints fastpath lifecycle/debug details (`kernel_table`, source-of-truth, restart/crash behavior, management hints).
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
 - Binary download prefers `updates.json` platform asset URLs (raw tag paths) and falls back to raw tag/main URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`, `github.com/.../raw/refs/heads/main/bin/...`) when needed.
 - `update --version X.Y.Z` installs a specific version.
@@ -255,8 +367,16 @@ bans delete
 bans list
   --permanent
   --all
+  --fastpath
   --ips-only
   --verbose
+
+config check
+  [FILE]                         # default /etc/mef/mef.conf
+
+status
+  --verbose
+  fastpath
 
 update
   --force
@@ -294,6 +414,8 @@ Global config (INI-style):
 - `whitelist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
 - `blacklist_dir` (default `/etc/mef/blacklist`)
 - `blacklist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
+- `blacklist_fastpath` (Linux permanent-blacklist acceleration: `auto|xdp|tc|disabled`, default `auto`; `auto` prefers XDP and falls back to `tc`)
+- `blacklist_fastpath_xdp_mode` (XDP attach preference: `auto|native|generic`, default `auto`)
 - `cache_dir` (default `/etc/mef/cache`, daemon runtime state)
 - `debug` (enable debug logging, default `false`)
 - `debug_log` (log file path when debug is enabled, default `/tmp/mef.txt`)
@@ -331,6 +453,7 @@ Global config (INI-style):
 - `ps_exclude_ports_refresh` (refresh interval for `ps_exclude_ports=auto`, default `1m`)
 - `ps_source_order` (source priority list, default `packet,conntrack,journal`)
 - `ps_packet_udp` (include UDP in `packet` source tracking, default `false`; when `true`, mefdaemon auto-manages `/etc/mef/whitelist/auto-whitelist.conf` with DNS resolvers, default gateways, and DHCP server IPs to reduce false positives)
+- `ps_packet_kernel_drop` (enable packet-source blocked-IP kernel-drop/early-skip path, default `true`; independent from `blacklist_fastpath`, set `false` to run packet source without this optimization)
 - `ps_escalation_enabled` (enable PS second-stage permanent blacklist escalation)
 - `ps_escalation_window` (PS escalation window)
 - `ps_permanent_threshold` (first-stage PS bans before permanent blacklist)
@@ -361,6 +484,7 @@ Linux v1 source order (default):
 
 Source behavior differences:
 - `packet` sees raw inbound packets early and catches scans against dropped/closed ports, but can use more CPU under heavy flood traffic.
+- `packet` reader can use blocked-IP early skip path (minimal parse + snapshot lookup) when `ps_packet_kernel_drop=true`, avoiding full event/channel/tracker work for already blocked sources.
 - `conntrack` is lighter but only sees flows that reach conntrack `NEW` tracking; scans against dropped/non-tracked ports may be invisible.
 - With `ps_exclude_ports=auto`, local listening service ports (for example `22,25,80,443,465,587`) are excluded from PS counting for all sources.
 - PS ban threshold is strict: ban triggers when `unique_ports > ps_limit` (not `>=`).
@@ -384,6 +508,7 @@ ps_exclude_ports=auto,22,443
 ps_exclude_ports_refresh=1m
 ps_source_order=packet,conntrack,journal
 ps_packet_udp=false
+ps_packet_kernel_drop=true
 ps_escalation_enabled=true
 ps_escalation_window=24h
 ps_permanent_threshold=3
@@ -433,6 +558,7 @@ Notes:
 - `ps_stats=false` disables periodic `port scan stats ...` log lines.
 - `ps_stats_interval` controls stats frequency; counters are runtime-only and reset on daemon/source restart.
 - Stats include `repeat_port` for repeated same-port events that do not increase `unique_ports`.
+- Packet source stats include `skip_banned_early` for packets dropped in the reader before full event processing (`ps_packet_kernel_drop=true`).
 - `ps_exclude_ports=auto` detects local listening server ports (TCP+UDP) and excludes them from PS counting.
 - `ps_packet_udp=true` enables UDP tracking for `packet` source and auto-generates `/etc/mef/whitelist/auto-whitelist.conf` (resolvers, gateways, DHCP servers).
 - If `ps_packet_udp` is disabled (or PS is disabled), that auto-generated whitelist file is removed.
@@ -505,6 +631,50 @@ Reload behavior:
 - large changes use atomic tmp+swap set sync with batched nft element loading
 
 Whitelist has precedence: if an address matches both, whitelist wins.
+
+## Fastpath operations (tc/xdp)
+
+Fastpath is managed by `mefdaemon` from the same source-of-truth as permanent blacklist enforcement.
+Active fastpath enforcement requires Linux with `nftables` backend (`iptables` backend keeps fastpath disabled).
+
+Inspect:
+```bash
+mefctl status --verbose fastpath
+mefctl bans list --fastpath --ips-only
+```
+
+Typical output fields:
+- `active/configured mode` (`tc`, `xdp`, `disabled`)
+- `ifaces`
+- `entries_v4`, `entries_v6`
+- `prefixes` (CIDR prefixes, non-host entries)
+- `last_sync`
+
+Lifecycle:
+- `mefctl reload mefdaemon` or `mefctl restart mefdaemon` re-syncs fastpath state from blacklist files and runtime ban snapshots.
+- If daemon crashes, `table netdev mef_fastpath` may remain in kernel until next daemon sync or manual delete.
+- Runtime timeout ban mirror has short periodic sync lag (not strictly per-event instant).
+
+Ban management through mefctl:
+- List active kernel fastpath entries:
+  - `mefctl bans list --fastpath`
+  - `mefctl bans list --fastpath --ips-only`
+- Remove runtime timeout bans:
+  - `mefctl bans clear`
+- Remove one permanent entry:
+  - `mefctl bans delete <ip-or-cidr> --permanent`
+- Remove one entry from everywhere:
+  - `mefctl bans delete <ip-or-cidr> --all`
+
+Emergency reset:
+```bash
+nft delete table netdev mef_fastpath
+mefctl restart mefdaemon
+```
+
+Difference vs `inet mef`:
+- `netdev mef_fastpath` (`tc` ingress) drops early before userspace packet parsing.
+- `inet mef` contains normal firewall/runtime/per-rule enforcement path.
 
 ## Firewall backends
 - nftables (preferred)
