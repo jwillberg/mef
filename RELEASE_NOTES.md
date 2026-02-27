@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## v1.0.7 - 2026-02-27
+- firewall/logging: add rate-limited firewall LOG controls to reduce softirq/journal overload under flood when `firewall_log_enabled=true`.
+- firewall/logging: add `firewall_log_rate` (default `1`) and `firewall_log_burst` (default `5`) with conservative production defaults (`1/5`); DROP remains unconditional.
+- mefctl/update: fix pinned-version install/downgrade path when `updates.json` asset URL points to a different tag; fallback to computed raw tag URL.
+- ps/packet (PS-006): add high-PPS receive mode controls `ps_packet_rx_mode=auto|recvfrom|mmap` and `ps_packet_fanout_sockets=1..64`.
+- ps/packet: add mmap-ring packet reader path (TPACKET_V3) with fallback/compatibility recvfrom path.
+- ps/packet safety: keep default `ps_packet_rx_mode=recvfrom` (stable rollout); mmap/auto remain opt-in.
+- ps/packet safety: if kernel lacks `PACKET_IGNORE_OUTGOING`, mmap mode now fails/falls back in auto mode to avoid outgoing-frame amplification.
+- ps/packet (PS-005): implement single-pass parse path and keep early-drop-hit path allocation-light with deferred event string construction.
+- tests/perf: add Linux packet parser benchmarks (`BenchmarkPacketReadEvent*`) and read-loop early-drop regression tests.
+- ddos/cpu: optimize Stage 2 polling path so episode detection runs before detail-set reads and detail reads are scoped by episode IP family/set.
+- config: add `ddos_poll_interval` (default `5s`) for Stage 2 poll cadence tuning.
+- config: add `ddos_signal_details_enabled=true|false` (default `true`) for optional Stage 1 detail-set overhead control.
+- mefdaemon/mefctl: extend config key-audit coverage for `ddos_poll_interval` and `ddos_signal_details_enabled`.
+- docs: clarify PS/RBL source-order CPU behavior (`packet` visibility vs `conntrack` overhead tradeoff) and conntrack+auto-exclude PS visibility caveat.
+- mefdaemon: add initial DDOS-001 reimplementation with two-stage DDoS guard (`ddos_*`):
+  - Stage 1 kernel soft throttle rules per protected port (`syn_rate`, `newconn_rate`, `connlimit`) for nftables and iptables backends.
+  - Stage 2 daemon escalation polls backend throttle kernel sets directly (not firewall log parsing) and escalates repeat offenders to runtime bans (`RULE=DDOS`, `SOURCE=KERNEL`).
+- config: add DDOS global keys and per-port override syntax (`ddos_port_<port>_{syn_rate,syn_burst,newconn_rate,newconn_burst,connlimit}`) with parser validation.
+- config defaults: change `ddos_ports` baseline default to `80,443` (from broad mixed-service list) to reduce accidental over-enforcement on non-exposed ports.
+- mefdaemon: add DDOS whitelist-kernel-set sync (IPv4/IPv6) so whitelist entries bypass DDOS throttle/escalation path.
+- mefdaemon/mefctl: extend `config check` key-audit coverage for DDOS keys (including dynamic per-port keys).
+- tests/docs: add DDOS config + tracker unit tests, update release README/conf template, and improve `mef.conf` readability with clearer spacing between settings.
+- docs: clarify DDOS key units/scope in `mef.conf` and README (`per-second` vs `burst count` vs `concurrent count`, plus escalation duration/count semantics).
+- config: add `ddos_escalation_enabled=true|false` (default `true`) to choose Stage 2 DDOS runtime-ban escalation vs throttle/drop-only mode.
+- config audit: fix hidden-key false positive; `community_report_insecure_tls` is now treated as hidden optional key (same as `community_report_token`) and is no longer reported missing when omitted.
+- ddos observability: add Stage 1 throttle logging (`THROTTLE`) in addition to Stage 2 escalation ban logging (`BAN`) with `RULE=DDOS`, `SOURCE=KERNEL`.
+- ddos observability: make Stage 2 logging outcome-accurate; `BAN` is now emitted only after runtime ban apply succeeds, and failures are emitted as `BAN_FAIL` with error reason.
+- ddos observability: suppress duplicate Stage 1 `THROTTLE` logs for IPs that are already under active DDOS runtime ban.
+- ddos observability: stop emitting DDOS event notices (`stage1 throttle`, `stage2 ban/fail`) via daemon journal `log.Printf`; DDOS events now stay in `ban_log` (`/var/log/mef.log`) and optional `debug_log`.
+- ddos observability: enrich `THROTTLE`/`BAN` `msg` with Stage 1 trigger context from kernel detail sets (port + limit family + configured threshold values); add explicit `hit_model=episodes` tag to clarify that `throttle_hits` counts Stage 1 episodes (set re-entry), not raw packet count.
+- community reporting: add DDOS integration for successful Stage 2 bans (`service=ddos`); DDOS `THROTTLE`/`BAN_FAIL` are not community-reported.
+- mefctl: add DDoS throttle scope management for ban operations: `bans list --ddos`, `bans delete --ddos`, `bans clear --ddos`; default `bans delete <ip>` now targets runtime + DDoS throttle sets, and `--all` also includes DDoS throttle sets.
+- ddos behavior: add `ddos_stage1_mode=throttle|drop` (default `throttle`) to choose Stage 1 action model:
+  - `throttle`: drop only over-limit packets/connections
+  - `drop`: temporary full source drop while source is in throttle set
+- ddos behavior: add `ddos_stage1_timeout=<duration>` to control Stage 1 throttle-set lifetime (and full-drop duration when `ddos_stage1_mode=drop`).
+- ddos behavior: `ddos_bantime` now also supports `permanent` for Stage 2 persistent blacklist escalation.
+
 ## v1.0.6 - 2026-02-26
 - config audit: add drift warnings for `mef.conf` keys; `mefdaemon` now logs missing/unknown `[global]` keys at startup/reload, and `mefctl config check [FILE]` reports the same audit on demand.
 - mefdaemon: add Linux permanent-blacklist fastpath framework with `blacklist_fastpath=auto|xdp|tc|disabled` and `blacklist_fastpath_xdp_mode=auto|native|generic`; runtime sync now writes status to `cache_dir/blacklist_fastpath_status.json` and `mefctl status` shows active/configured mode, interfaces, `entries_v4`, `entries_v6`, `prefixes`, and `last_sync`.

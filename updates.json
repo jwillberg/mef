@@ -1,36 +1,36 @@
 {
-  "latest_version": "1.0.6",
+  "latest_version": "1.0.7",
   "min_version": "1.0.0",
   "assets": {
     "linux_amd64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_linux_amd64",
-      "sha256": "6acca1be13eec7ecb8956dcb48054cca8ac1f108e4603515126fcb24eea36c55",
-      "size": 4493820
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_linux_amd64",
+      "sha256": "85a86ed7bfeb8c09a42af0c407d763ca9ecbc1f858b6c0712a98e6abd3d9c5d0",
+      "size": 4634408
     },
     "linux_arm64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_linux_arm64",
-      "sha256": "231e0ce6379b257149ae794369e829ec776f074a06c68e20987739f4c0b739a3",
-      "size": 3306120
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_linux_arm64",
+      "sha256": "f6fe11fdf7bdaa4ec6a2d8788c95270b122b2f753a2296215eea2fe605de00c8",
+      "size": 3398552
     },
     "darwin_amd64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_darwin_amd64",
-      "sha256": "f0511499ad0f2e4ab2f59be8d38019492c556fbec3faedae79f4742ec145e982",
-      "size": 13617200
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_darwin_amd64",
+      "sha256": "c16ce1246ac33f4ecb2c5590166f3f88ad4cd567f17883c0aaf18e6966d08a77",
+      "size": 14347744
     },
     "darwin_arm64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_darwin_arm64",
-      "sha256": "bed7ecd22911c9cd2b665441edd501f67d58cf12293df8e83ae3f0f2f6ac9ab9",
-      "size": 11053314
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_darwin_arm64",
+      "sha256": "9b7aed036980401598c1b73ce2280c97c930f6ede1ad87566bac645b7f835f1b",
+      "size": 11528946
     },
     "freebsd_amd64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_freebsd_amd64",
-      "sha256": "6979789eba8b5e9533939c281c03b48bb0cf05d8500f9120437b4753554a776f",
-      "size": 13217950
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_freebsd_amd64",
+      "sha256": "279c7bbda216d08b5ce429e2015381ea2587dbf4858c8ca6bf300d4582e65006",
+      "size": 13754526
     },
     "freebsd_arm64": {
-      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.6/bin/mefdaemon_freebsd_arm64",
-      "sha256": "ec64983c221293ddea57a229497b1670dba99f8f3771339d580c63447f19134e",
-      "size": 10748062
+      "url": "https://github.com/jwillberg/mef/raw/refs/tags/v1.0.7/bin/mefdaemon_freebsd_arm64",
+      "sha256": "e90ec87f173436f53568d9091edc54d281bdc87e5704a0d9086cafdf5dbd181a",
+      "size": 11141278
     }
   }
 }
