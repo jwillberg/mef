@@ -319,13 +319,13 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.7 --force
+sudo ./update.sh --version 1.0.8 --force
 ```
 
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.7.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.8.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -434,6 +434,10 @@ Notes:
 - `[FILE]` is optional. If omitted, mefctl uses `/etc/mef/mef.rules`.
 - `rules fmt` does NOT modify firewall state.
 - `rules validate` is recommended before `rules apply`.
+- `rules apply` auto-rolls back after `--timeout` if no `yes` confirmation is received.
+- `rules apply` now verifies rollback restore results; if restore fails, it attempts backend clear fallback and reports rollback errors.
+- manual `rules apply` does not activate boot lifecycle by itself; if `mef.service` is inactive/disabled, `stop mef` may not clear those manually-loaded rules and rules may not load on reboot.
+- for managed lifecycle/persistence use: `mefctl enable mef && mefctl start mef` (manual cleanup remains `mefctl rules clear`).
 - `rules migrate` reads running nftables rules and prints mef.rules text to stdout by default.
 - `rules migrate` excludes the mef.conf managed nft table by default.
 - `bans add --permanent` writes to `blacklist_dir/*.conf` and survives reboot.
@@ -529,6 +533,10 @@ service mefdaemon status
 service mef reload            # Reload firewall rules
 service mefdaemon reload      # Reload daemon config
 ```
+
+`mefctl enable mefdaemon` note:
+- prints PS prerequisite output only when attention is needed (warnings).
+- when PS prerequisites are OK, it stays quiet (no extra `PSD: ... ready` line).
 
 ## Config
 - Global config: `/etc/mef/mef.conf`

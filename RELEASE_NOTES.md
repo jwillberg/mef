@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v1.0.8 - 2026-02-28
+- mefctl/rules apply: fix rollback reliability on confirm-timeout/no-confirm path.
+- mefctl/rules apply: rollback now verifies restore result; if restore fails, it attempts backend clear fallback and reports failures instead of silently printing success.
+- mefctl/rules apply: add post-apply lifecycle hint when `mef.service` is inactive/disabled, clarifying manual apply vs service-managed stop/boot behavior.
+- mefctl/enable mefdaemon: PS prerequisite output is now warnings-only; when prerequisites are healthy it no longer prints extra `PSD: ... ready` line or blank spacer.
+
 ## v1.0.7 - 2026-02-27
 - firewall/logging: add rate-limited firewall LOG controls to reduce softirq/journal overload under flood when `firewall_log_enabled=true`.
 - firewall/logging: add `firewall_log_rate` (default `1`) and `firewall_log_burst` (default `5`) with conservative production defaults (`1/5`); DROP remains unconditional.
