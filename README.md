@@ -319,13 +319,13 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.8 --force
+sudo ./update.sh --version 1.0.9 --force
 ```
 
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.8.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.9.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -525,13 +525,13 @@ update
 # systemd (Linux)
 systemctl status mef mefdaemon
 systemctl reload mef          # Reload firewall rules
-systemctl reload mefdaemon    # Reload daemon config
+systemctl reload mefdaemon    # Reload daemon config and rules.d watchers
 
 # FreeBSD
 service mef status
 service mefdaemon status
 service mef reload            # Reload firewall rules
-service mefdaemon reload      # Reload daemon config
+service mefdaemon reload      # Reload daemon config and rules.d watchers
 ```
 
 `mefctl enable mefdaemon` note:
@@ -545,7 +545,12 @@ service mefdaemon reload      # Reload daemon config
 
 Rule note (`source=journal`):
 - `programs` supports exact names and wildcards, e.g. `sshd`, `sshd*`, `postfix/*`, or `*`.
-- Use `mefctl reload mefdaemon` for config changes only; after binary upgrade, use `mefctl restart mefdaemon`.
+- Use `mefctl reload mefdaemon` after adding, editing, enabling, disabling, or removing `rules.d/*.conf` files. The daemon validates the complete new rule set before replacing active journal/file watchers; if validation fails, the existing watchers remain active and the error is logged.
+- After a binary upgrade, use `mefctl restart mefdaemon`.
+
+The shipped disabled `nginx.conf` and `apache.conf` examples include a PHP-probe matcher for `.php` request paths, with optional query strings, returning HTTP `403`, `404`, or `406`. Each profile also includes a general HTTP error matcher. All matcher hits within one profile share that rule's `findtime`/`maxretry` counter. Both profiles exclude common static image, CSS, JavaScript/source-map, and web-font requests (case-insensitive, optional query string) so missing assets do not increase the ban counter. The Apache profile monitors common Debian/Ubuntu (`/var/log/apache2`) and RHEL-family (`/var/log/httpd`) access-log paths and accepts the optional `vhost:port` prefix used by `other_vhosts_access.log`.
+
+Three disabled Exim examples are shipped for different installations: `exim-cpanel.conf`, `exim-directadmin.conf`, and the conservative generic fallback `exim.conf`. Enable only the profile matching the server. The cPanel and DirectAdmin profiles recognize their platform-specific SMTP AUTH `535 Incorrect authentication data` and invalid-HELO formats, plus connections dropped for excessive SMTP protocol errors. The generic profile recognizes only `535` SMTP AUTH failures and dropped protocol-abuse connections. These profiles deliberately exclude temporary `435` authentication failures, cancelled `501` authentication attempts, and broad `rejected RCPT` matching, because those records can represent delivery policy or ordinary recipient errors rather than an attack. All three profiles ban only SMTP ports `25`, `465`, and `587`; IMAP/POP authentication belongs in a separate Dovecot profile.
 
 Repo default config template: [conf/mef.conf](conf/mef.conf)
 
@@ -699,7 +704,7 @@ nft list set inet mef mefpermbanned_v6
 ```
 
 Notes:
-- `mefctl reload mefdaemon` reloads config only; use `restart` after binary upgrades.
+- `mefctl reload mefdaemon` reloads global config and the complete `rules.d` watcher set; use `restart` after binary upgrades.
 - Whitelist is always checked before PS counting/banning.
 - FreeBSD currently runs PS as no-op (Linux-only in this version).
 - `ps_interface=auto` selects default-route interface(s); explicit lists (`eth0,eth1`) restrict PS to those interfaces.

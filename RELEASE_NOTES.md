@@ -1,6 +1,12 @@
 # Release notes
 
-## Unreleased
+## v1.0.9 - 2026-07-17
+- mefdaemon: `mefctl reload mefdaemon` / SIGHUP now reloads `rules.d/*.conf` and replaces journal/file watchers without a daemon restart; invalid replacement rules are rejected while the previously active watchers keep running.
+- rules/nginx: extend the shipped disabled nginx rule example with a PHP-probe matcher for `.php` paths (optional query string) returning HTTP `403`, `404`, or `406`.
+- rules/nginx: exclude common static images, CSS, JavaScript/source maps, and web fonts from the example rule's error counter, with case-insensitive extension matching and query-string support.
+- rules/apache: add a disabled Apache access-log rule example for common Debian/Ubuntu and RHEL-family paths, with PHP-probe and general HTTP error matchers, grouped static-asset exclusions, and optional `other_vhosts_access.log` vhost-prefix support.
+- rules/exim: add separate disabled cPanel, DirectAdmin, and conservative generic Exim SMTP profiles derived from real log formats; match selected `535` authentication failures and dropped protocol abuse, add platform-specific HELO detection where reliable, and keep bans scoped to ports `25`, `465`, and `587`.
+- rules/exim: avoid broad `rejected RCPT` matching and exclude temporary `435` and cancelled `501` authentication failures; IMAP/POP authentication remains outside the Exim SMTP profiles.
 
 ## v1.0.8 - 2026-02-28
 - mefctl/rules apply: fix rollback reliability on confirm-timeout/no-confirm path.
