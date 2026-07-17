@@ -1,5 +1,14 @@
 # Release notes
 
+## v1.0.10 - 2026-07-17
+- packaging: installers now select explicit `mefdaemon_<os>_<arch>` and `mefctl_<os>_<arch>` binaries on macOS, Linux, and FreeBSD; macOS no longer depends on ambiguous host-built generic binaries.
+- packaging: release validation now rejects legacy unsuffixed binaries and requires both programs for every supported OS/architecture target, preventing stale or incomplete binary sets from being published.
+- docs: correct manual Linux and FreeBSD installation commands to select their platform-specific `amd64` or `arm64` binaries.
+- mefctl: add lightweight `version`, `--version`, and `-v` commands that print the CLI version and exit without system/configuration checks.
+- mefdaemon: add lightweight `version`, `--version`, and `-v` commands that print the daemon version and exit before startup, update checks, configuration loading, or worker initialization.
+- mefctl/update: add non-root, read-only `mefctl update check` to fetch metadata and report current/latest/minimum versions plus up-to-date, optional-update, mandatory-update, or newer-than-published status without downloading or installing anything.
+- mefctl/update: keep ordinary CLI commands free of implicit network checks; update availability is queried only through the explicit check/install commands.
+
 ## v1.0.9 - 2026-07-17
 - mefdaemon: `mefctl reload mefdaemon` / SIGHUP now reloads `rules.d/*.conf` and replaces journal/file watchers without a daemon restart; invalid replacement rules are rejected while the previously active watchers keep running.
 - rules/nginx: extend the shipped disabled nginx rule example with a PHP-probe matcher for `.php` paths (optional query string) returning HTTP `403`, `404`, or `406`.

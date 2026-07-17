@@ -319,13 +319,13 @@ Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
 sudo ./update.sh --force
-sudo ./update.sh --version 1.0.9 --force
+sudo ./update.sh --version 1.0.10 --force
 ```
 
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.9.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.10.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -334,9 +334,14 @@ cd /tmp/mef-release
 ### Manual install
 #### Linux (systemd, Debian/Ubuntu/RHEL/Fedora)
 ```bash
+case "$(uname -m)" in
+  x86_64|amd64) MEF_ARCH=amd64 ;;
+  aarch64|arm64) MEF_ARCH=arm64 ;;
+  *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
 sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
-sudo cp -f bin/mefdaemon /usr/local/sbin/mefdaemon
-sudo cp -f bin/mefctl /usr/local/sbin/mefctl
+sudo cp -f "bin/mefdaemon_linux_${MEF_ARCH}" /usr/local/sbin/mefdaemon
+sudo cp -f "bin/mefctl_linux_${MEF_ARCH}" /usr/local/sbin/mefctl
 sudo chmod 0755 /usr/local/sbin/mefdaemon /usr/local/sbin/mefctl
 
 sudo cp -n conf/mef.conf /etc/mef/mef.conf
@@ -365,9 +370,14 @@ mefctl status
 
 #### FreeBSD
 ```sh
+case "$(uname -m)" in
+  x86_64|amd64) MEF_ARCH=amd64 ;;
+  aarch64|arm64) MEF_ARCH=arm64 ;;
+  *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
 sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
-sudo install -m 0755 bin/mefdaemon /usr/local/sbin/mefdaemon
-sudo install -m 0755 bin/mefctl /usr/local/sbin/mefctl
+sudo install -m 0755 "bin/mefdaemon_freebsd_${MEF_ARCH}" /usr/local/sbin/mefdaemon
+sudo install -m 0755 "bin/mefctl_freebsd_${MEF_ARCH}" /usr/local/sbin/mefctl
 sudo install -m 0644 conf/mef.conf /etc/mef/mef.conf
 sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
 sudo install -d /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist
@@ -394,6 +404,7 @@ mefctl status
 
 ### mefctl (CLI)
 ```bash
+mefctl version                         # Print version and exit (aliases: --version, -v)
 mefctl rules <action> [FILE]     # default FILE: /etc/mef/mef.rules
   fmt                            # Normalize/pretty-print rules file
   validate                       # Validate syntax + interfaces (recommended before apply)
@@ -427,7 +438,18 @@ mefctl start   <mef|mefdaemon>
 mefctl stop    <mef|mefdaemon>
 mefctl reload  <mef|mefdaemon>
 mefctl restart <mef|mefdaemon>
+mefctl update check                          # Check availability; do not install (no root required)
 mefctl update [--force] [--version X.Y.Z]  # Install release binaries to /usr/local/sbin
+```
+
+### mefdaemon version
+
+The daemon binary exposes the same lightweight version check. It exits before reading configuration, checking for updates, opening logs, or starting detector workers:
+
+```bash
+mefdaemon version
+mefdaemon --version
+mefdaemon -v
 ```
 
 Notes:
@@ -462,6 +484,8 @@ Notes:
 - `--permanent`, `--ddos`, and `--all` are mutually exclusive scope selectors in `bans list` and `bans delete`.
 - `status --verbose fastpath` prints fastpath lifecycle/debug details (`kernel_table`, source-of-truth, restart/crash behavior, management hints).
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
+- `update check` fetches release metadata and prints the current, latest, and minimum supported versions without downloading, installing, restarting services, or requiring root privileges.
+- Normal `mefctl` commands do not perform hidden network checks; use `mefctl update check` when a fresh availability result is wanted.
 - Binary download prefers `updates.json` platform asset URLs (raw tag paths) and falls back to raw tag/main URLs (`github.com/.../raw/refs/tags/vX.Y.Z/bin/...`, `github.com/.../raw/refs/heads/main/bin/...`) when needed.
 - If metadata asset URL version does not match requested `--version`, updater ignores that metadata URL and uses computed `vX.Y.Z` raw tag URLs.
 - `update --version X.Y.Z` installs a specific version.
@@ -516,6 +540,7 @@ status
   fastpath
 
 update
+  check
   --force
   --version <X.Y.Z>
 ```

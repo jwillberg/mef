@@ -70,16 +70,9 @@ case "${OS}" in
   ;;
 esac
 
-# Select correct binaries
-if [[ "${OS_SUFFIX}" == "darwin" ]]; then
-  # macOS: use generic binaries (usually no arch suffix in release)
-  MEFDAEMON_BIN="${ROOT_DIR}/bin/mefdaemon"
-  MEFCTL_BIN="${ROOT_DIR}/bin/mefctl"
-else
-  # Linux/FreeBSD: use OS_arch suffixed binaries
-  MEFDAEMON_BIN="${ROOT_DIR}/bin/mefdaemon_${OS_SUFFIX}_${ARCH_SUFFIX}"
-  MEFCTL_BIN="${ROOT_DIR}/bin/mefctl_${OS_SUFFIX}_${ARCH_SUFFIX}"
-fi
+# Select the exact OS/architecture binaries on every supported platform.
+MEFDAEMON_BIN="${ROOT_DIR}/bin/mefdaemon_${OS_SUFFIX}_${ARCH_SUFFIX}"
+MEFCTL_BIN="${ROOT_DIR}/bin/mefctl_${OS_SUFFIX}_${ARCH_SUFFIX}"
 
 # Verify binaries exist
 if [[ ! -f "${MEFDAEMON_BIN}" ]]; then
