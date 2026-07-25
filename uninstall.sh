@@ -53,6 +53,7 @@ if [[ "${OS}" == "Linux" ]]; then
     systemctl daemon-reload
     systemctl reset-failed || true
   fi
+  rm -f /etc/logrotate.d/mef
 elif [[ "${OS}" == "FreeBSD" ]]; then
   service mefdaemon stop || true
   rm -f /usr/local/etc/rc.d/mefdaemon

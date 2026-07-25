@@ -92,6 +92,66 @@ METADATA_URLS=(
   "https://github.com/jwillberg/mef/raw/refs/heads/main/updates.json"
 )
 
+resolve_ban_log_path() {
+  local cfg="/etc/mef/mef.conf"
+  local path="/var/log/mef.log"
+  if [[ -f "${cfg}" ]]; then
+    local parsed
+    parsed="$(awk '
+      BEGIN { in_global=0 }
+      /^[[:space:]]*\[/ {
+        sec=$0
+        gsub(/^[[:space:]]*\[/, "", sec)
+        gsub(/\][[:space:]]*$/, "", sec)
+        in_global=(tolower(sec)=="global")
+        next
+      }
+      {
+        line=$0
+        sub(/[;#].*$/, "", line)
+      }
+      in_global && line ~ /^[[:space:]]*ban_log_path[[:space:]]*=/ {
+        sub(/^[[:space:]]*ban_log_path[[:space:]]*=[[:space:]]*/, "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        print line
+        exit
+      }
+    ' "${cfg}" 2>/dev/null || true)"
+    if [[ -n "${parsed}" ]]; then
+      path="${parsed}"
+    fi
+  fi
+  printf '%s\n' "${path}"
+}
+
+install_linux_logrotate_policy() {
+  local log_path="$1"
+  if ! command -v logrotate >/dev/null 2>&1; then
+    echo "warning: logrotate not found; skipping /etc/logrotate.d/mef policy update"
+    return 0
+  fi
+  install -d /etc/logrotate.d
+  cat >/etc/logrotate.d/mef <<EOF
+${log_path} {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    sharedscripts
+    postrotate
+        if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+            systemctl kill -s HUP mefdaemon.service >/dev/null 2>&1 || true
+        fi
+    endscript
+}
+EOF
+  chmod 0644 /etc/logrotate.d/mef
+  echo "Updated logrotate policy: /etc/logrotate.d/mef (log=${log_path})"
+}
+
 normalize_version() {
   local v="${1#v}"
   if [[ ! "${v}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
@@ -363,6 +423,11 @@ fi
 
 if [[ "${restart_ok}" != "1" ]]; then
   echo "warning: failed to restart mefdaemon automatically"
+fi
+
+if [[ "${OS}" == "Linux" ]]; then
+  BAN_LOG_PATH="$(resolve_ban_log_path)"
+  install_linux_logrotate_policy "${BAN_LOG_PATH}"
 fi
 
 echo "Update complete. Installed version target=${TARGET_VERSION}"

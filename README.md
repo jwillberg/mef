@@ -315,6 +315,11 @@ For uninstall:
 sudo ./uninstall.sh
 ```
 
+Linux log rotation:
+- install/update now manage `/etc/logrotate.d/mef` automatically.
+- the rotated file target follows `ban_log_path` from `/etc/mef/mef.conf` (default `/var/log/mef.log`).
+- policy defaults: `daily`, `rotate 14`, `compress`, `delaycompress`.
+
 Legacy update script (for older installs without `mefctl update`):
 ```bash
 sudo ./update.sh
@@ -322,10 +327,22 @@ sudo ./update.sh --force
 sudo ./update.sh --version 1.0.10 --force
 ```
 
+Backfill for existing Linux installs:
+```bash
+cd /path/to/mef-release
+sudo ./update.sh --force
+```
+
+Logrotate quick check (Linux):
+```bash
+ls -l /etc/logrotate.d/mef
+sudo logrotate -d /etc/logrotate.conf
+```
+
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.10.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.11.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -428,6 +445,10 @@ mefctl lists <type>
 
 mefctl config <action>
   check [FILE]                   # Audit mef.conf [global] keys (missing/unknown)
+  update [FILE]                  # Append missing known [global] keys with defaults
+
+mefctl stats
+                                 # Attack/block dashboard from ban_log (phase 1)
 
 mefctl status [--verbose] [fastpath]
                                  # Show service + firewall status
@@ -481,6 +502,32 @@ Notes:
 - `bans list --verbose` prints raw backend rows with source set.
 - `config check` audits `[global]` keys and reports missing known keys (defaults in effect) plus unknown keys (possible typo/legacy).
 - `config check` does not require hidden optional keys (`community_report_token`, `community_report_insecure_tls`) and does not warn when they are omitted.
+- `config update` appends missing known `[global]` keys with built-in defaults and writes `<FILE>.bak` backup before save.
+- `config update --dry-run` previews keys that would be added without modifying files.
+- `stats` shows aggregated attack/block counters from `ban_log` (single-screen dashboard in phase 1).
+- `stats --window` filters by time window and `stats --format json` provides machine-readable output.
+- `stats --window` max is `14d` (aligned with default logrotate horizon); larger windows are rejected.
+- `stats` text mode keeps startup output minimal (title + four sections) to reduce incident-time noise.
+- `stats` `RATIO` columns show each row's percentage share of total attacks in the selected window.
+- `stats` shows `DETECTORS` in source rows (top trigger summary such as `RBL:53,CLOUD:41`) so operators can see mixed detection paths per source IP.
+- `stats` targeted ports table includes a best-effort `SERVICE` hint for common ports (for example `22=ssh`, `443=https`, `5060=sip`).
+- `stats` text output is intentionally focused to four sections only: `Top Targeted Ports`, `Top Attack Sources`, `Top Attack Detectors`, and `Last Attacks`.
+- `stats` text mode uses decorated section headers (`### ... ###`) for faster scanning during incident response.
+- `stats` all four report sections (`Top Targeted Ports`, `Top Attack Sources`, `Top Attack Detectors`, `Last Attacks`) are fully responsive: wide terminals (≥100 cols) show complete details with timestamps and ports; mid-range (80-99 cols) show compact rows with essential info; narrow (<80 cols) show minimal columns to fit the terminal.
+- `stats` terminal width is auto-detected via `COLUMNS` env, `stty size`, or `tput cols`; if undetected, defaults to 80 cols.
+- `stats` `TARGETS` column dynamically sizes based on actual port list lengths in your data; wide terminals get full port lists (terminal width permitting), narrower terminals compress intelligently using estimated port counts per available width.
+- `stats` `RATIO` columns show each row's percentage share of total attacks.
+- `stats` shows `DETECTORS` in source rows (top trigger summary) so operators see mixed detection paths per IP.
+- `stats` scans rotated `ban_log` files (`<ban_log_path>.1`, `.2`, ... and `.gz` variants when present) and reads historical files backward based on selected `--window`, so 24h/7d windows remain complete across logrotate boundaries.
+- `stats` historical cache retention is bounded (14d window horizon + safety margin) and stale rotated-cache snapshots are cleaned automatically.
+- during first-run or cache-miss historical parsing, `stats` prints progress lines for rotated logs (`history scan`, `history parse`, `history ready`) so long scans do not look stuck.
+- when `COLUMNS` is unset, `stats` probes terminal width (`stty size` / `tput cols`) and falls back to an 80-column-safe layout.
+- `status` now prints explicit `log rotation` state (`ok`, `missing`, `mismatch`, `degraded`) on Linux/FreeBSD.
+- Linux status checks `/etc/logrotate.d/mef` target against configured `ban_log_path`; FreeBSD status checks newsyslog targets in `/etc/newsyslog.conf` and `/usr/local/etc/newsyslog.conf`.
+- `status` keeps service/PSD/fastpath/log-rotation labels aligned, wraps long values to the same value column, and indents nftables `[+]`/`[i]` markers consistently for easier visual scanning.
+- `status` aggregates runtime advisories into a dedicated `Warnings:` section at the end of output (instead of mixing warning lines inside service/detail blocks).
+- `fix check` reports known local remediation status; `fix all` applies safe automatic fixes.
+- `fix all` currently remediates missing/mismatched ban log rotation config for configured `ban_log_path` (Linux logrotate, FreeBSD newsyslog) and requires root.
 - `--permanent`, `--ddos`, and `--all` are mutually exclusive scope selectors in `bans list` and `bans delete`.
 - `status --verbose fastpath` prints fastpath lifecycle/debug details (`kernel_table`, source-of-truth, restart/crash behavior, management hints).
 - `update` fetches release metadata from `updates.json` and installs `/usr/local/sbin/mefdaemon` and `/usr/local/sbin/mefctl`.
@@ -534,6 +581,18 @@ bans clear
 
 config check
   [FILE]                         # default /etc/mef/mef.conf
+
+config update
+  --dry-run
+  [FILE]                         # default /etc/mef/mef.conf
+
+stats
+  --window <duration>
+  --scope <boot|daemon|lifetime>
+  --top-ports <N>
+  --top-sources <N>
+  --format <text|json>
+  --log-path <FILE>
 
 status
   --verbose

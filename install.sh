@@ -31,6 +31,67 @@ done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+resolve_ban_log_path() {
+  local cfg="/etc/mef/mef.conf"
+  local path="/var/log/mef.log"
+  if [[ -f "${cfg}" ]]; then
+    local parsed
+    parsed="$(awk '
+      BEGIN { in_global=0 }
+      /^[[:space:]]*\[/ {
+        sec=$0
+        gsub(/^[[:space:]]*\[/, "", sec)
+        gsub(/\][[:space:]]*$/, "", sec)
+        in_global=(tolower(sec)=="global")
+        next
+      }
+      {
+        line=$0
+        sub(/[;#].*$/, "", line)
+      }
+      in_global && line ~ /^[[:space:]]*ban_log_path[[:space:]]*=/ {
+        sub(/^[[:space:]]*ban_log_path[[:space:]]*=[[:space:]]*/, "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        print line
+        exit
+      }
+    ' "${cfg}" 2>/dev/null || true)"
+    if [[ -n "${parsed}" ]]; then
+      path="${parsed}"
+    fi
+  fi
+  printf '%s\n' "${path}"
+}
+
+install_linux_logrotate_policy() {
+  local log_path="$1"
+  if ! command -v logrotate >/dev/null 2>&1; then
+    echo "[!] logrotate not found; skipping /etc/logrotate.d/mef policy install"
+    return 0
+  fi
+
+  install -d /etc/logrotate.d
+  cat >/etc/logrotate.d/mef <<EOF
+${log_path} {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    sharedscripts
+    postrotate
+        if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+            systemctl kill -s HUP mefdaemon.service >/dev/null 2>&1 || true
+        fi
+    endscript
+}
+EOF
+  chmod 0644 /etc/logrotate.d/mef
+  echo "[+] Installed logrotate policy: /etc/logrotate.d/mef (log=${log_path})"
+}
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     if command -v sudo >/dev/null 2>&1; then
@@ -137,6 +198,9 @@ else
 fi
 
 if [[ "${OS}" == "Linux" ]]; then
+  BAN_LOG_PATH="$(resolve_ban_log_path)"
+  install_linux_logrotate_policy "${BAN_LOG_PATH}"
+
   PSD_CONNTRACK_HINT="install package providing 'conntrack' (often: conntrack or conntrack-tools)"
   if [[ -f /etc/os-release ]]; then
     # shellcheck disable=SC1091

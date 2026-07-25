@@ -1,5 +1,31 @@
 # Release notes
 
+## v1.0.11 - 2026-07-25
+- mefctl/config: add `config update [FILE]` to append missing known `[global]` keys in `mef.conf` using built-in defaults, with automatic `<FILE>.bak` backup creation before writing.
+- mefctl/config: add `config update --dry-run` preview mode to list missing keys and default values without changing files.
+- mefctl/stats: add phase 1 `stats` dashboard command that aggregates `ban_log` events into a single operational view (total attacks, blocked count/rate, distinct attackers, top targeted ports, top sources, detector breakdown).
+- mefctl/stats: add `--window`, `--scope`, `--top-ports`, `--top-sources`, `--format json`, and `--log-path` options for filtered and automatable output.
+- packaging/linux: add automatic `/etc/logrotate.d/mef` management in install/update/dev-deploy paths to prevent unbounded `ban_log` growth (daily, rotate 14, compress).
+- uninstall/linux: remove `/etc/logrotate.d/mef` policy on uninstall.
+- mefctl/status: `status` now warns when log rotation config is missing/mismatched for configured `ban_log_path` (Linux: `/etc/logrotate.d/mef`, FreeBSD: newsyslog targets), enabling local self-remediation on existing installs.
+- mefctl/stats: include rotated `ban_log` files (`<ban_log_path>.1`, `.2`, ... including `.gz` variants) in window calculations and scan backward based on selected `--window`, so 24h/7d views remain complete across logrotate boundaries.
+- mefctl/stats: cap `--window` to `14d` (logrotate-aligned) and tighten stats cache retention/cleanup for rotated snapshots to reduce unbounded cache growth on high-traffic hosts.
+- mefctl/stats: add visible rotated-history parsing progress (`history scan` / `history parse` / `history ready`) on interactive terminals to avoid “stuck” perception during first large window scans.
+- mefctl/stats: update `Top Attack Sources` to show `TARGETS` (attacked port list) so each source row directly indicates where that IP was attacking.
+- mefctl/stats: upgrade `Top Attack Sources` detector field from single `DETECTOR` to `DETECTORS` summary (top N trigger counts per source, for example `RBL:53,CLOUD:41`) so mixed trigger patterns are visible at a glance.
+- mefctl/stats: harden terminal-width detection when `COLUMNS` is unset by probing terminal columns (`stty size` / `tput cols`) and defaulting to an 80-col-safe layout.
+- mefctl/stats: simplify text output structure to four incident-focused sections only: `Top Targeted Ports`, `Top Attack Sources`, `Top Attack Detectors`, and `Last Attacks`.
+- mefctl/stats: make all four report sections (`Top Targeted Ports`, `Top Attack Sources`, `Top Attack Detectors`, `Last Attacks`) fully responsive to terminal width with true dynamic field allocation: system measures actual content lengths (longest detector name, longest target port list, etc.) and allocates space based on real data needs; if space permits, shows full content; if constrained, prioritizes `TARGETS` for port visibility while shrinking `DETECTORS` intelligently; auto-detects terminal width via `COLUMNS`/`stty`/`tput`.
+- mefctl/status: align service/PSD/fastpath/log-rotation labels, wrap long values to a consistent value column, and indent nftables `[+]`/`[i]` markers consistently for cleaner terminal readability; log rotation label now prints as `log rotation`.
+- mefctl/status: fix premature line breaks in service/status rows by using terminal-width-aware value wrapping (`COLUMNS`) and plain-text service status tokens (no ANSI color width skew).
+- mefctl/status: restore colorized service status output when terminal supports ANSI (respects `NO_COLOR`, supports `CLICOLOR_FORCE=1`) while keeping wrap calculations ANSI-aware.
+- mefctl/status: remove stale warning that claimed `mef.service` should not auto-start when enabled; `status` now treats intentional boot-enabled `mef.service` as normal after operator validation.
+- mefctl/status: add targeted warnings when services are `RUNNING` but `boot: disabled`, so operators are alerted that firewall rules/auto-banning will not return automatically after reboot.
+- mefctl/status: print explicit `Ban log rotation` state (`ok`/`missing`/`mismatch`/`degraded`) so operators can verify logrotate/newsyslog integration directly from status output.
+- mefctl: add `fix` command (`fix check`, `fix all`) for local remediation workflows; `fix all` now owns ban log rotation remediation across supported server OSes (Linux logrotate + FreeBSD newsyslog target repair for configured `ban_log_path`).
+- mefctl/status: when log rotation policy/target is missing, mismatched, or degraded, status now prints direct remediation hint: `sudo mefctl fix all`.
+- mefctl/status: consolidate service/log-rotation advisories into a single `Warnings:` section at end of output for clearer scanning during incidents.
+
 ## v1.0.10 - 2026-07-17
 - packaging: installers now select explicit `mefdaemon_<os>_<arch>` and `mefctl_<os>_<arch>` binaries on macOS, Linux, and FreeBSD; macOS no longer depends on ambiguous host-built generic binaries.
 - packaging: release validation now rejects legacy unsuffixed binaries and requires both programs for every supported OS/architecture target, preventing stale or incomplete binary sets from being published.
