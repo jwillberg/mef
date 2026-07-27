@@ -5,6 +5,7 @@
 It combines:
 - **Persistent firewall management** (nftables preferred, iptables fallback)
 - **Fail2ban-style log monitoring and automatic IP blocking**
+- **WebScan HTTP episode detection** (per-IP request pattern analysis)
 - Built-in **DDoS/FLOOD guard** (Stage 1 kernel `THROTTLE`, Stage 2 optional runtime `BAN`)
 - **DNS-based RBL/DNSBL enforcement**
 - Optional **Community Cloud threat intelligence**
@@ -24,10 +25,12 @@ mef consists of two standalone services that work together or separately:
 - Works with nftables or iptables backends
 
 ### 2. **mefdaemon** (auto-ban service)
-- Monitors logs (journal/files) for failed authentication attempts
-- Automatically bans offending IPs (fail2ban-style)
+- Monitors logs (journal/files) for failed authentication attempts (fail2ban-style rules)
+- Analyzes HTTP access logs for attack patterns (WebScan HTTP episode detection)
+- Automatically bans offending IPs via firewall
 - Runs continuously as a daemon
 - Per-service rules in `/etc/mef/rules.d/*.conf`
+- WebScan HTTP rules in `/etc/mef/webscan.d/*.conf`
 
 **Both services are independent** - you can use:
 - Both together (firewall + auto-banning)
@@ -50,9 +53,12 @@ mef consists of two standalone services that work together or separately:
 - One clear config per service (no separate jail/filter)
 - Bans via nftables/iptables backends
 - Built-in **Port Scan Detection (PS)** with packet/conntrack/journal sources
+- Built-in **WebScan HTTP Episode Detection** (per-IP request pattern analysis with configurable thresholds)
 - Built-in **DDoS/FLOOD guard** (`THROTTLE` episodes from kernel set + optional Stage 2 runtime `BAN`)
 - **RBL/DNSBL profiles** with port-scoped bans
 - **Configurable RBL cache TTLs** (`positive_ttl`, `negative_ttl`, `error_ttl`)
+- **IP Whitelist** (CIDR-based allow-list, checked before counting/banning)
+- **Permanent Blacklist** (persistent ban files, survives daemon restart + optional fastpath acceleration)
 - Optional **Community Cloud protection** (`community_cloud_protection`)
 - Safe defaults, easy install
 
@@ -163,9 +169,9 @@ Important behavior notes:
 - `firewall_log_enabled=true` is rate-limited by `firewall_log_rate` / `firewall_log_burst` to prevent kernel/journal overload under flood.
 - firewall LOG limits are applied per firewall LOG rule (not per source IP).
 
-## v1.0.7 Stabilization Bug Notes (Symptoms, Root Cause, Fix)
+## Troubleshooting: Known Symptoms & Solutions
 
-Use this section when validating upgrades or incident cleanup.
+Use this section when diagnosing operational issues or validating upgrades.
 
 `Symptom: high %si / ksoftirqd / journald load under flood when firewall logging is enabled`
 - Root cause: firewall `LOG` rules were not rate-limited, so dropped packet floods could generate excessive kernel log volume.
@@ -342,7 +348,7 @@ sudo logrotate -d /etc/logrotate.conf
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.11.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.12.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
@@ -356,7 +362,7 @@ case "$(uname -m)" in
   aarch64|arm64) MEF_ARCH=arm64 ;;
   *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
 esac
-sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
+sudo mkdir -p /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/webscan.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
 sudo cp -f "bin/mefdaemon_linux_${MEF_ARCH}" /usr/local/sbin/mefdaemon
 sudo cp -f "bin/mefctl_linux_${MEF_ARCH}" /usr/local/sbin/mefctl
 sudo chmod 0755 /usr/local/sbin/mefdaemon /usr/local/sbin/mefctl
@@ -364,6 +370,7 @@ sudo chmod 0755 /usr/local/sbin/mefdaemon /usr/local/sbin/mefctl
 sudo cp -n conf/mef.conf /etc/mef/mef.conf
 sudo cp -n conf/mef.rules /etc/mef/mef.rules
 sudo cp -n conf/rules.d/*.conf /etc/mef/rules.d/
+sudo cp -n conf/webscan.d/*.conf /etc/mef/webscan.d/
 sudo cp -n conf/whitelist/example.conf /etc/mef/whitelist/example.conf
 sudo cp -n conf/blacklist/example.conf /etc/mef/blacklist/example.conf
 
@@ -392,13 +399,14 @@ case "$(uname -m)" in
   aarch64|arm64) MEF_ARCH=arm64 ;;
   *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
 esac
-sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
+sudo install -d /usr/local/sbin /etc/mef /etc/mef/rules.d /etc/mef/webscan.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
 sudo install -m 0755 "bin/mefdaemon_freebsd_${MEF_ARCH}" /usr/local/sbin/mefdaemon
 sudo install -m 0755 "bin/mefctl_freebsd_${MEF_ARCH}" /usr/local/sbin/mefctl
 sudo install -m 0644 conf/mef.conf /etc/mef/mef.conf
 sudo install -m 0644 conf/mef.rules /etc/mef/mef.rules
-sudo install -d /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist
+sudo install -d /etc/mef/rules.d /etc/mef/webscan.d /etc/mef/whitelist /etc/mef/blacklist
 sudo install -m 0644 conf/rules.d/*.conf /etc/mef/rules.d/
+sudo install -m 0644 conf/webscan.d/*.conf /etc/mef/webscan.d/
 sudo install -m 0644 conf/whitelist/example.conf /etc/mef/whitelist/example.conf
 sudo install -m 0644 conf/blacklist/example.conf /etc/mef/blacklist/example.conf
 sudo install -m 0755 services/freebsd/mef /usr/local/etc/rc.d/mef
@@ -459,6 +467,8 @@ mefctl start   <mef|mefdaemon>
 mefctl stop    <mef|mefdaemon>
 mefctl reload  <mef|mefdaemon>
 mefctl restart <mef|mefdaemon>
+mefctl fix check                             # Report known local remediation status
+mefctl fix all                               # Apply safe automatic fixes (requires root)
 mefctl update check                          # Check availability; do not install (no root required)
 mefctl update [--force] [--version X.Y.Z]  # Install release binaries to /usr/local/sbin
 ```
@@ -598,6 +608,9 @@ status
   --verbose
   fastpath
 
+fix
+  [no options]
+
 update
   check
   --force
@@ -624,8 +637,9 @@ service mefdaemon reload      # Reload daemon config and rules.d watchers
 
 ## Config
 - Global config: `/etc/mef/mef.conf`
-- Per-service rules: `/etc/mef/rules.d/*.conf`
-- Startup behavior: mefdaemon now starts even when `rules.d` has no enabled rules (or no rule files). In that mode, only global detectors/features (PS, RBL, CLOUD) run if enabled.
+- Per-service fail2ban-style rules: `/etc/mef/rules.d/*.conf`
+- Per-service HTTP detection rules: `/etc/mef/webscan.d/*.conf` (WebScan)
+- Startup behavior: mefdaemon now starts even when `rules.d` has no enabled rules (or no rule files). In that mode, only global detectors/features (PS, RBL, CLOUD) and WebScan run if enabled.
 
 Rule note (`source=journal`):
 - `programs` supports exact names and wildcards, e.g. `sshd`, `sshd*`, `postfix/*`, or `*`.
@@ -641,11 +655,12 @@ Repo default config template: [conf/mef.conf](conf/mef.conf)
 Global config (INI-style):
 - `rules_dir` (default `/etc/mef/rules.d`)
 - `whitelist_dir` (default `/etc/mef/whitelist`)
-- `whitelist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
+- `whitelist_reload` (default `1m`, supports `10s`, `1m`, integer seconds, or `0`/`false` to disable auto-reload)
 - `blacklist_dir` (default `/etc/mef/blacklist`)
-- `blacklist_reload` (default `1m`, supports `10s`, `1m`, or integer seconds)
+- `blacklist_reload` (default `1m`, supports `10s`, `1m`, integer seconds, or `0`/`false` to disable auto-reload; file-granular diffing, unchanged files skipped)
 - `blacklist_fastpath` (Linux permanent-blacklist acceleration: `auto|xdp|tc|disabled`, default `auto`; `auto` prefers XDP and falls back to `tc`)
 - `blacklist_fastpath_xdp_mode` (XDP attach preference: `auto|native|generic`, default `auto`)
+- `webscan_dir` (default `/etc/mef/webscan.d`, WebScan HTTP detection rules)
 - `cache_dir` (default `/etc/mef/cache`, daemon runtime state)
 - `debug` (enable debug logging, default `false`)
 - `debug_log` (log file path when debug is enabled, default `/tmp/mef.txt`)
@@ -702,6 +717,114 @@ Global config (INI-style):
 - `firewall_log_level` (LOG level, default `warn`)
 - `firewall_log_rate` (LOG rate limit in logs/second, default `1`; scope is per firewall LOG rule, not per source IP)
 - `firewall_log_burst` (LOG burst bucket size, default `5`)
+
+## WebScan HTTP Detection
+
+WebScan is a per-service HTTP log analyzer (separate from `rules.d` regex matching):
+- Analyzes Combined Log Format (CLF) HTTP access logs per service (nginx, Apache, etc.)
+- Aggregates per-IP metrics across configurable sliding time windows (e.g., 60s, 300s)
+- Tracks unique URIs, User-Agents, and HTTP status code breakdown per IP
+- Detects attack patterns via configurable threshold criteria:
+  - `requests_min`: minimum request count in window
+  - `uri_count_min`: minimum unique URIs in window
+  - `ua_count_min`: minimum unique User-Agents in window
+  - `status_code` patterns: match specific HTTP responses (e.g., `40[346]` for 403/404/406)
+- Per-rule pattern whitelisting (glob-based URI, User-Agent, file extension patterns)
+- Optional inactivity timeout and LRU memory bounds prevent unbounded growth
+- Action modes: `detect` (log only) or `ban` (firewall + optional unban timeout)
+- Hot-reload via SIGHUP (`mefctl reload mefdaemon`)
+
+WebScan rules are configured separately from fail2ban-style rules:
+- Location: `/etc/mef/webscan.d/*.conf` (configurable via `webscan_dir`)
+- One config file per web service
+- Each file contains `[rule]`, `[detection]`, `[webscan]`, and `[thresholds]` sections
+- Independent from `rules.d/*.conf` (which match via regex failregex patterns)
+
+Shipped disabled `apache.conf` example rule:
+- Monitors common Debian/Ubuntu (`/var/log/apache2`) and RHEL-family (`/var/log/httpd`) paths
+- Accepts optional `vhost:port` prefix from `other_vhosts_access.log`
+- Includes PHP-probe detection (`.php` paths returning 403/404/406)
+- Excludes common static assets (images, CSS, JS, fonts) from episode counting
+- Configurable sliding windows and per-window thresholds
+- Per-rule pattern whitelist for trusted URIs, User-Agents, extensions
+
+Recommended test config (`/etc/mef/webscan.d/apache.conf`):
+```ini
+[rule]
+enabled=true
+name=apache-http
+input=source=file
+
+[detection]
+files=/var/log/apache2/access.log,/var/log/httpd/access_log
+
+[webscan]
+# Per-IP HTTP episode detection
+request_timeout=300
+uri_limit=500
+ua_limit=200
+request_limit=1000
+
+[thresholds]
+# 60-second window: trigger if >20 requests OR >5 unique URIs
+window=60
+requests_min=20
+uri_count_min=5
+status_code=40[346]
+
+# 300-second window: trigger if >100 requests AND >10 unique URIs
+window=300
+requests_min=100
+uri_count_min=10
+status_code=40[346]
+
+[whitelist]
+# Skip static assets and trusted paths
+uri=*.jpg,*.png,*.gif,*.css,*.js,*.map,*.woff,*.woff2
+uri=/healthcheck
+uri=/api/status
+ua=*monitoring*
+ua=*bot*
+
+[action]
+action=ban
+ports=80,443
+bantime=1h
+```
+
+Apply and verify:
+```bash
+mefctl reload mefdaemon
+journalctl -u mefdaemon -f
+```
+
+Expected runtime logs:
+- `[webscan] apache-http source=file active` (rule activated)
+- `[WEBSCAN] ... HIT ... requests=X unique_uri=Y unique_ua=Z` (episode detected)
+- `[WEBSCAN] ... BAN ...` (threshold exceeded, IP banned)
+
+Quick checks:
+```bash
+# Check rule is loaded and active
+journalctl -u mefdaemon -n 50 --no-pager | grep -i webscan
+
+# Monitor for WebScan bans
+grep "RULE=WEBSCAN" /var/log/mef.log
+
+# View active WebScan bans
+mefctl bans list | grep -i webscan
+```
+
+Notes:
+- WebScan rules are independent from `rules.d` fail2ban-style rules; both can run simultaneously.
+- `mefctl reload mefdaemon` reloads `webscan.d/*.conf` files and replaces active HTTP log watchers.
+- If new `webscan.d` file is invalid, previously active watchers remain active and error is logged.
+- WebScan pattern whitelist uses shell glob syntax (`*` wildcard); supports both compact (`uri=*.jpg,*.png`) and multi-line (`uri=*.jpg` / `uri=*.png`) formats.
+- Global IP whitelist (`/etc/mef/whitelist/*.conf`, CIDR-based) is always checked before WebScan thresholds.
+- Per-rule pattern whitelist prevents matching requests from counting toward episode thresholds.
+- WebScan respects local interface IPs; traffic from local machine is skipped and logged as `SKIP_LOCAL`.
+- WebScan action can be `detect` (log only, no ban) or `ban` (firewall enforcement).
+- Community reporting integrates WebScan bans with full detection context: window duration, request count, unique_uris/ua counts, matched status codes.
 
 ## Port Scan Detection (PS)
 
@@ -848,6 +971,7 @@ Comments are allowed:
 - Inline comments, e.g. `1.2.3.4 # office`
 
 Whitelist entries are loaded into memory and reloaded periodically (default `1m`, configurable via `whitelist_reload`).
+- When `whitelist_reload=0` or `false`, automatic reload is disabled; use `mefctl reload mefdaemon` for manual updates.
 - Reserved auto-managed file: `/etc/mef/whitelist/auto-whitelist.conf` (created only when `ps_enabled=true` and `ps_packet_udp=true`).
 
 ## Blacklist
@@ -858,6 +982,8 @@ Repo example blacklist: [conf/blacklist/example.conf](conf/blacklist/example.con
 Format: one entry per line (`IP` or `CIDR`).
 
 Blacklist entries are enforced as permanent bans and reloaded periodically (default `1m`, configurable via `blacklist_reload`).
+- When `blacklist_reload=0` or `false`, automatic reload is disabled; use `mefctl reload mefdaemon` for manual updates.
+- File-granular diffing: only changed files are re-synced (fast incremental updates); unchanged files are skipped.
 
 Set mapping:
 - `auto-permanent.conf` -> `mefpermbanned_v4` / `mefpermbanned_v6`

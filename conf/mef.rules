@@ -5,7 +5,7 @@
 # ---- defaults ----
 policy dir=in  action=drop
 policy dir=fwd action=drop
-policy dir=out action=accept  # tighten later if needed
+policy dir=out action=accept  # permissive by default (tighten to drop later, see RESTRICTIVE OUTBOUND below)
 
 # ---- always allow loopback ----
 rule dir=in  action=accept proto=all iif=lo  comment="loopback in"
@@ -17,6 +17,9 @@ rule dir=out action=accept proto=all ct=established,related comment="ct establis
 
 # ---- inbound services (WAN auto) ----
 
+# FTP example (uncomment if running FTP server):
+# rule dir=in action=accept proto=tcp iif=auto dport=21 comment="FTP"
+
 # SSH: OPEN by default for initial setup - RESTRICT THIS AFTER TESTING!
 # After confirming access, uncomment src= lines below and remove the open rule
 rule dir=in action=accept proto=tcp iif=auto dport=22 comment="SSH - OPEN (RESTRICT THIS!)"
@@ -25,9 +28,19 @@ rule dir=in action=accept proto=tcp iif=auto dport=22 comment="SSH - OPEN (RESTR
 # rule dir=in action=accept proto=tcp iif=auto src=YOUR.IP.ADDR.HERE dport=22 comment="SSH admin IP"
 # rule dir=in action=accept proto=tcp iif=auto src=185.185.168.0/22 dport=22 comment="SSH admin network"
 
+# HTTP / HTTPS examples (uncomment if running web server):
+# rule dir=in action=accept proto=tcp iif=auto dport=80  comment="HTTP"
+# rule dir=in action=accept proto=tcp iif=auto dport=443 comment="HTTPS"
+
 # SMTP / Submission examples (uncomment if running mail server):
 # rule dir=in action=accept proto=tcp iif=auto dport=25  comment="SMTP"
 # rule dir=in action=accept proto=tcp iif=auto dport=587 comment="SUBMISSION"
+
+# IMAP / POP3 examples (uncomment if running mail server):
+# rule dir=in action=accept proto=tcp iif=auto dport=143 comment="IMAP"
+# rule dir=in action=accept proto=tcp iif=auto dport=993 comment="IMAPS"
+# rule dir=in action=accept proto=tcp iif=auto dport=110 comment="POP3"
+# rule dir=in action=accept proto=tcp iif=auto dport=995 comment="POP3S"
 
 # ICMP (optional, for troubleshooting)
 rule dir=in action=accept proto=icmp  iif=auto comment="ICMPv4 ping"
@@ -35,4 +48,62 @@ rule dir=in action=accept proto=icmp6 iif=auto comment="ICMPv6 ping"
 
 # ---- outbound (WAN auto) ----
 rule dir=out action=accept proto=all oif=auto comment="OUTBOUND"
+
+# ============================================================================
+# RECOMMENDATION: RESTRICTIVE OUTBOUND FILTERING
+# ============================================================================
+#
+# Currently, outbound is PERMISSIVE (accept all).
+# This is safe for initial setup, but security best-practice is to restrict
+# outbound to only services you actually need.
+#
+# TO ENABLE RESTRICTIVE MODE:
+#   1. Replace "policy dir=out action=accept" at top with:
+#      policy dir=out action=drop
+#   2. Uncomment the rules below (or copy/adapt them for your services)
+#   3. Test thoroughly (especially SSH, DNS, updates)
+#   4. Remember: stateful firewall auto-allows responses via ct=established,related
+#
+# HOW IT WORKS (stateful firewall):
+#   - When a server process initiates outbound connection (e.g., HTTP client),
+#     firewall tracks the flow and automatically allows responses back.
+#   - When a client INITIATES inbound connection (e.g., client connects to port 80),
+#     firewall allows incoming, and the server's response (ct=established,related)
+#     is auto-allowed outbound regardless of port restrictions.
+#
+#   Example: Server runs HTTP (port 80), client initiates:
+#   1. Client → Server:80 (allowed by inbound rule)
+#   2. Server:random_port → Client (allowed by ct=established,related rule)
+#
+# ---- BEGIN RESTRICTIVE RULES (uncomment and adapt) ----
+#
+# # Outbound: established connections (responses to inbound requests)
+# rule dir=out action=accept proto=all oif=auto ct=established,related comment="ct established/related out"
+#
+# # Outbound: HTTP/HTTPS (for outbound client requests, e.g., curl, wget, package managers)
+# rule dir=out action=accept proto=tcp oif=auto dport=80  comment="HTTP out"
+# rule dir=out action=accept proto=tcp oif=auto dport=443 comment="HTTPS out"
+#
+# # Outbound: DNS (required for hostname resolution)
+# rule dir=out action=accept proto=tcp oif=auto dport=53 comment="DNS TCP out"
+# rule dir=out action=accept proto=udp oif=auto dport=53 comment="DNS UDP out"
+#
+# # Outbound: DHCP (if using DHCP client for IP assignment)
+# rule dir=out action=accept proto=udp oif=auto dport=67:68 comment="DHCP out"
+#
+# # Outbound: ICMP (for ping, traceroute, diagnostics)
+# rule dir=out action=accept proto=icmp  oif=auto comment="ICMPv4 out"
+# rule dir=out action=accept proto=icmp6 oif=auto comment="ICMPv6 out"
+#
+# ---- END RESTRICTIVE RULES ----
+#
+# ADD MORE AS NEEDED:
+#   - SMTP out (port 25): if server sends mail
+#   - IMAP/POP3 out (port 143/110): if connecting to external mail servers
+#   - NTP out (port 123 UDP): if time sync needed
+#   - Custom app ports: if application needs outbound to specific services
+#
+# ONCE RESTRICTIVE RULES ARE IN PLACE:
+#   - Default policy is drop, all other outbound is blocked
+#   - Add rules as needed for new services
 

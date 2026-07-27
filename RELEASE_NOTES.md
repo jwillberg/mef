@@ -1,5 +1,29 @@
 # Release notes
 
+## v1.0.12 - 2026-07-27
+
+- mefdaemon: add WebScan HTTP episode detection engine as a completely separate subsystem from `rules.d` regex matchers; WebScan reads rules from `/etc/mef/webscan.d/*.conf` (configurable via `webscan_dir` in `[global]`), aggregates per-IP HTTP request patterns across configurable sliding time windows, and triggers bans when thresholds are exceeded.
+- mefdaemon/webscan: add whitelist and local IP validation before triggering bans to prevent accidental banning of trusted hosts or local services; detection events from whitelisted or local IPs are logged as `SKIP_WHITELIST` / `SKIP_LOCAL` to aid debugging.
+- mefdaemon/webscan: add per-rule pattern whitelisting via `[whitelist]` section in `webscan.d/*.conf` to skip requests matching URI patterns, User-Agent patterns, or file extensions before threshold evaluation; whitelisted requests do not contribute to episode counters (requests, unique_uri, unique_ua, status breakdown); pattern matching uses shell glob syntax with `*` wildcard for simplicity; supports both compact (`uri=*.jpg,*.png`) and multi-line (`uri=*.jpg` / `uri=*.png`) config formats.
+- mefdaemon: add startup and reload logging for whitelist and blacklist with detailed statistics (single IPs vs CIDR, IPv4 vs IPv6 counts); enables operators to verify load status at daemon start and after configuration reload (`SIGHUP` / `mefctl reload mefdaemon`).
+- mefdaemon/rules.d: add multi-line `files=` support for traditional rules to match `failregex=` accumulation behavior; rules can now use both compact (`files=/a,/b`) and multi-line (`files=/a` / `files=/b`) formats for better readability on complex log paths.
+- packaging/rules.d: improve example rule configuration files (`apache.conf`, `exim-cpanel.conf`, `nginx.conf`, etc.) with standardized, consistent inline comments using concise action-focused documentation style; each section includes purpose, configuration options, and practical examples to improve usability and reduce configuration errors.
+- mefdaemon: remove duplicate timestamp in systemd journal logs by disabling Go logger time formatting; systemd/journald now provides single canonical timestamp per log line.
+- mefdaemon/webscan: align ban log format with standard detector format (PORTSCAN, RBL, etc.): `RULE=WEBSCAN | SOURCE=FILE | BAN | ip=... | bantime=... | action=... | msg=...` where msg includes full threshold context (`rule=`, `requests=`, `unique_uri=`, `unique_ua=`, `window=`).
+- mefdaemon: standardize startup logging across all subsystems to use `[module]` prefix (e.g. `[webscan]`, `[whitelist]`, `[blacklist]`, `[portscan]`, `[rbl]`, `[firewall]`, `[ddos]`, `[community]`, `[recidive]`, `[daemon]`) for clarity and consistency in daemon logs; portscan packet source includes `[portscan] kernel drop` and `[portscan] receiver` status messages.
+- mefdaemon/webscan: WebScan rule format supports `[rule]`, `[detection]`, `[webscan]`, and `[thresholds]` INI sections with Combined Log Format (CLF) HTTP log parsing, per-IP metrics (total requests, unique URIs, unique User-Agents, status code breakdown), and multiple configurable detection patterns per rule.
+- mefdaemon/webscan: sliding window aggregation tracks multiple durations per rule (e.g. 60s, 300s) and evaluates thresholds independently; threshold criteria include `requests_min`, `uri_count_min`, `ua_count_min`, and optional `status_code` pattern matching with per-pattern counts.
+- mefdaemon/webscan: WebScan IP state includes configurable inactivity timeout and LRU-bounded unique-set limits for URIs and User-Agents to prevent unbounded memory growth under attack.
+- mefdaemon/webscan: action modes include `detect` (log only) and `ban` (firewall + optional unban timeout).
+- mefdaemon/webscan: rule hot-reload via SIGHUP (context: `mefdaemon` already supported rule reload for `rules.d`; WebScan extends same reload lifecycle).
+- mefdaemon/PS: eBPF kernel drop optimization for port scan packet source is optional and performance-only; when eBPF LPM map creation is unavailable (e.g. nested virtualization, cgroup restrictions, restricted environments), port scan detection remains fully functional via userspace packet filtering path with negligible CPU impact on typical workloads.
+- mefdaemon: community reporting integration for WebScan bans includes full detection context: `rule` name, `window` duration, `requests` count, `unique_uris` and `unique_ua` counts, matched `status_code` pattern, `status_matches` count, and complete `status_breakdown` map for multi-status rules.
+- mefctl/config audit: add `webscan_dir` to known optional global config keys with default value `/etc/mef/webscan.d`.
+- mefctl/config update: `mefctl config update` now includes `webscan_dir` in auto-corrected missing keys (when used with `--force` or on fresh install).
+- packaging/conf: add `mef.conf` template entry `webscan_dir=/etc/mef/webscan.d` with explanatory comment describing WebScan as separate from `rules.d` regex matching.
+- packaging/conf: add example `webscan.d/httpd.conf` rule for HTTP access log analysis (Combined Log Format, nginx/Apache/LiteSpeed compatible).
+- packaging/install: install script now creates `/etc/mef/webscan.d` directory and copies `conf/webscan.d/*.conf` rules during fresh install (or on `--force`), mirroring `rules.d` install behavior.
+
 ## v1.0.11 - 2026-07-25
 - mefctl/config: add `config update [FILE]` to append missing known `[global]` keys in `mef.conf` using built-in defaults, with automatic `<FILE>.bak` backup creation before writing.
 - mefctl/config: add `config update --dry-run` preview mode to list missing keys and default values without changing files.

@@ -153,7 +153,7 @@ install -d /usr/local/sbin
 install -m 0755 "${MEFDAEMON_BIN}" /usr/local/sbin/mefdaemon
 install -m 0755 "${MEFCTL_BIN}" /usr/local/sbin/mefctl
 
-install -d /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache
+install -d /etc/mef /etc/mef/rules.d /etc/mef/whitelist /etc/mef/blacklist /etc/mef/cache /etc/mef/webscan.d
 touch /etc/mef/blacklist/auto-permanent.conf
 
 if [[ "${FORCE}" == "1" ]]; then
@@ -171,6 +171,10 @@ if [[ "${FORCE}" == "1" ]]; then
   done
   install -m 0644 "${ROOT_DIR}/conf/whitelist/example.conf" /etc/mef/whitelist/example.conf
   install -m 0644 "${ROOT_DIR}/conf/blacklist/example.conf" /etc/mef/blacklist/example.conf
+  for f in "${ROOT_DIR}/conf/webscan.d"/*.conf; do
+    [[ -f "${f}" ]] || continue
+    install -m 0644 "${f}" "/etc/mef/webscan.d/${f##*/}"
+  done
   touch /etc/mef/blacklist/auto-permanent.conf
 else
   if [[ ! -f /etc/mef/mef.conf ]]; then
@@ -192,6 +196,13 @@ else
   if [[ ! -f /etc/mef/blacklist/example.conf ]]; then
     install -m 0644 "${ROOT_DIR}/conf/blacklist/example.conf" /etc/mef/blacklist/example.conf
   fi
+  for f in "${ROOT_DIR}/conf/webscan.d"/*.conf; do
+    [[ -f "${f}" ]] || continue
+    base="${f##*/}"
+    if [[ ! -f "/etc/mef/webscan.d/${base}" ]]; then
+      install -m 0644 "${f}" "/etc/mef/webscan.d/${base}"
+    fi
+  done
   if [[ ! -f /etc/mef/blacklist/auto-permanent.conf ]]; then
     touch /etc/mef/blacklist/auto-permanent.conf
   fi
