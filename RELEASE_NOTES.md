@@ -1,7 +1,14 @@
 # Release notes
 
-## v1.0.12 - 2026-07-27
+## v1.0.13 - 2026-07-28
+- mefdaemon: fix ban log and debug log file handle reopening on SIGHUP reload; when log rotation occurs and logrotate sends SIGHUP, daemon now closes and reopens log file handles to write to rotated files instead of continuing to write to deleted inode, ensuring all events reach the current log file.
+- mefdaemon: fix whitelist and blacklist periodic reload logging; convert debug-only output to journal-visible `log.Printf()` entries with `[whitelist]` and `[blacklist]` prefixes so operators can verify periodic reloads in systemd journal output; remove stale port-scan auto-whitelist sync logging from manual whitelist reload path.
+- mefdaemon: fix data race in periodic whitelist and blacklist reload by moving mutex initialization before signature fingerprint computation; ensures periodic reload correctly detects file changes without race condition.
+- mefdaemon: fix variable shadowing in SIGHUP reload handler that prevented whitelist and blacklist change detection; use assignment operators instead of declarations to properly update outer scope variables.
+- mefdaemon: fix deadlock in SIGHUP reload by adding missing `blMu.Unlock()` call after blacklist signature comparison.
+- mefdaemon: add consistent logging for whitelist and blacklist count statistics across startup, SIGHUP reload, and periodic reload; show total IPs, IPv4/IPv6/CIDR breakdown, and file count in all reload paths for operational visibility; `[whitelist]` and `[blacklist]` reload log entries appear only when corresponding files change (per reload interval or SIGHUP), enabling operators to confirm periodic reload activation without noise.
 
+## v1.0.12 - 2026-07-27
 - mefdaemon: add WebScan HTTP episode detection engine as a completely separate subsystem from `rules.d` regex matchers; WebScan reads rules from `/etc/mef/webscan.d/*.conf` (configurable via `webscan_dir` in `[global]`), aggregates per-IP HTTP request patterns across configurable sliding time windows, and triggers bans when thresholds are exceeded.
 - mefdaemon/webscan: add whitelist and local IP validation before triggering bans to prevent accidental banning of trusted hosts or local services; detection events from whitelisted or local IPs are logged as `SKIP_WHITELIST` / `SKIP_LOCAL` to aid debugging.
 - mefdaemon/webscan: add per-rule pattern whitelisting via `[whitelist]` section in `webscan.d/*.conf` to skip requests matching URI patterns, User-Agent patterns, or file extensions before threshold evaluation; whitelisted requests do not contribute to episode counters (requests, unique_uri, unique_ua, status breakdown); pattern matching uses shell glob syntax with `*` wildcard for simplicity; supports both compact (`uri=*.jpg,*.png`) and multi-line (`uri=*.jpg` / `uri=*.png`) config formats.

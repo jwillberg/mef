@@ -348,7 +348,7 @@ sudo logrotate -d /etc/logrotate.conf
 ### Download & extract (example)
 ```bash
 # Replace URL/version as needed
-curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.12.tar.gz
+curl -L -o /tmp/mef-release.tar.gz https://github.com/jwillberg/mef/archive/refs/tags/v1.0.13.tar.gz
 mkdir -p /tmp/mef-release
 tar -xzf /tmp/mef-release.tar.gz -C /tmp/mef-release --strip-components=1
 cd /tmp/mef-release
